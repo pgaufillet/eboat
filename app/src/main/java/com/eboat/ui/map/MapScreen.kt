@@ -41,6 +41,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eboat.R
+import com.eboat.domain.model.GuidanceState
 import com.eboat.domain.model.Route
 import com.eboat.domain.model.Waypoint
 import org.maplibre.android.annotations.IconFactory
@@ -62,6 +63,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val waypoints by viewModel.waypoints.collectAsState()
     val routes by viewModel.routes.collectAsState()
     val activeRoute by viewModel.activeRoute.collectAsState()
+    val guidance by viewModel.guidance.collectAsState()
     val activeRouteWaypoints by viewModel.activeRouteWaypoints.collectAsState()
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var boatMarker by remember { mutableStateOf<Marker?>(null) }
@@ -174,14 +176,30 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 
                         map.addOnMapLongClickListener { latLng ->
                             if (waypointToMove != null) {
-                                // Complete move
                                 viewModel.moveWaypoint(waypointToMove!!, latLng.latitude, latLng.longitude)
                                 waypointToMove = null
                             } else {
-                                // Create new waypoint
-                                pendingWaypointLatLng = latLng
-                                waypointName = ""
-                                showWaypointDialog = true
+                                // Check if near an existing waypoint (tap tolerance)
+                                val nearWp = waypoints.minByOrNull {
+                                    com.eboat.domain.navigation.distanceNm(
+                                        latLng.latitude, latLng.longitude,
+                                        it.latitude, it.longitude
+                                    )
+                                }
+                                val nearDist = nearWp?.let {
+                                    com.eboat.domain.navigation.distanceNm(
+                                        latLng.latitude, latLng.longitude,
+                                        it.latitude, it.longitude
+                                    )
+                                }
+                                // If within ~200m of a waypoint, open action menu instead
+                                if (nearWp != null && nearDist != null && nearDist < 0.1) {
+                                    waypointToAct = nearWp
+                                } else {
+                                    pendingWaypointLatLng = latLng
+                                    waypointName = ""
+                                    showWaypointDialog = true
+                                }
                             }
                             true
                         }
@@ -214,15 +232,36 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             )
         }
 
-        // Navigation overlay
-        if (boatState.hasPosition) {
-            NavigationOverlay(
-                latitude = boatState.latitude,
-                longitude = boatState.longitude,
-                sog = boatState.speedOverGround,
-                cog = boatState.courseOverGround,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
-            )
+        // Guidance + Navigation overlays
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (guidance.active && !guidance.routeComplete) {
+                GuidanceOverlay(guidance = guidance)
+            }
+            if (guidance.routeComplete) {
+                Text(
+                    "Route termin\u00e9e",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF2E7D32), RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+            if (boatState.hasPosition) {
+                NavigationOverlay(
+                    latitude = boatState.latitude,
+                    longitude = boatState.longitude,
+                    sog = boatState.speedOverGround,
+                    cog = boatState.courseOverGround
+                )
+            }
         }
 
         // Active route name
@@ -433,6 +472,29 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 TextButton(onClick = { showRouteList = false }) { Text("Fermer") }
             }
         )
+    }
+}
+
+@Composable
+private fun GuidanceOverlay(guidance: GuidanceState) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF1B3A5C).copy(alpha = 0.85f), RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        NavDataItem("WPT", "${guidance.nextWaypointIndex + 1}/${guidance.totalWaypoints}\n${guidance.nextWaypointName}")
+        NavDataItem("BRG", String.format(Locale.US, "%.0f\u00B0", guidance.bearingToWaypoint))
+        NavDataItem("DST", String.format(Locale.US, "%.2f nm", guidance.distanceToWaypointNm))
+        NavDataItem("XTE", String.format(Locale.US, "%.2f nm", guidance.crossTrackNm))
+        val etaText = guidance.etaSeconds?.let { secs ->
+            val h = secs / 3600
+            val m = (secs % 3600) / 60
+            if (h > 0) String.format(Locale.US, "%dh%02dm", h, m)
+            else String.format(Locale.US, "%dm", m)
+        } ?: "--"
+        NavDataItem("ETA", etaText)
     }
 }
 

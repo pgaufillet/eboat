@@ -6,14 +6,23 @@ import androidx.lifecycle.viewModelScope
 import com.eboat.data.db.EboatDatabase
 import com.eboat.data.location.LocationRepository
 import com.eboat.domain.model.BoatState
+import com.eboat.domain.model.GuidanceState
 import com.eboat.domain.model.Route
 import com.eboat.domain.model.Waypoint
+import com.eboat.domain.navigation.bearingDeg
+import com.eboat.domain.navigation.crossTrackNm
+import com.eboat.domain.navigation.distanceNm
+import com.eboat.domain.navigation.etaSeconds
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/** Arrival radius in nautical miles */
+private const val ARRIVAL_RADIUS_NM = 0.05
 
 class MapViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -34,12 +43,16 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     val routes: StateFlow<List<Route>> = routeDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Waypoints for the currently active route, in order */
     private val _activeRouteWaypoints = MutableStateFlow<List<Waypoint>>(emptyList())
     val activeRouteWaypoints: StateFlow<List<Waypoint>> = _activeRouteWaypoints.asStateFlow()
 
     private val _activeRoute = MutableStateFlow<Route?>(null)
     val activeRoute: StateFlow<Route?> = _activeRoute.asStateFlow()
+
+    private val _guidance = MutableStateFlow(GuidanceState())
+    val guidance: StateFlow<GuidanceState> = _guidance.asStateFlow()
+
+    private var routeWaypointsJob: Job? = null
 
     fun startTracking() {
         if (_isTracking.value) return
@@ -47,6 +60,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             locationRepository.observeLocation().collect { state ->
                 _boatState.value = state
+                updateGuidance(state)
             }
         }
     }
@@ -82,8 +96,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteRoute(route: Route) {
         viewModelScope.launch {
             if (_activeRoute.value?.id == route.id) {
-                _activeRoute.value = null
-                _activeRouteWaypoints.value = emptyList()
+                deactivateRoute()
             }
             routeDao.deleteRoute(route)
         }
@@ -91,15 +104,70 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     fun activateRoute(route: Route) {
         _activeRoute.value = route
-        viewModelScope.launch {
+        _guidance.value = GuidanceState(active = true, nextWaypointIndex = 0)
+        routeWaypointsJob?.cancel()
+        routeWaypointsJob = viewModelScope.launch {
             routeDao.observeWaypointsForRoute(route.id).collect { wps ->
                 _activeRouteWaypoints.value = wps
+                _guidance.value = _guidance.value.copy(totalWaypoints = wps.size)
+                updateGuidance(_boatState.value)
             }
         }
     }
 
     fun deactivateRoute() {
+        routeWaypointsJob?.cancel()
         _activeRoute.value = null
         _activeRouteWaypoints.value = emptyList()
+        _guidance.value = GuidanceState()
+    }
+
+    fun advanceToNextWaypoint() {
+        val g = _guidance.value
+        if (g.nextWaypointIndex < g.totalWaypoints - 1) {
+            _guidance.value = g.copy(nextWaypointIndex = g.nextWaypointIndex + 1)
+            updateGuidance(_boatState.value)
+        }
+    }
+
+    private fun updateGuidance(boat: BoatState) {
+        val g = _guidance.value
+        if (!g.active || !boat.hasPosition) return
+        val wps = _activeRouteWaypoints.value
+        if (wps.isEmpty() || g.nextWaypointIndex >= wps.size) return
+
+        val target = wps[g.nextWaypointIndex]
+        val dist = distanceNm(boat.latitude, boat.longitude, target.latitude, target.longitude)
+        val bearing = bearingDeg(boat.latitude, boat.longitude, target.latitude, target.longitude)
+        val eta = etaSeconds(dist, boat.speedOverGround)
+
+        // Cross-track: from previous waypoint (or boat start) to target
+        val xte = if (g.nextWaypointIndex > 0) {
+            val prev = wps[g.nextWaypointIndex - 1]
+            crossTrackNm(
+                boat.latitude, boat.longitude,
+                prev.latitude, prev.longitude,
+                target.latitude, target.longitude
+            )
+        } else 0.0
+
+        _guidance.value = g.copy(
+            nextWaypointName = target.name,
+            bearingToWaypoint = bearing,
+            distanceToWaypointNm = dist,
+            crossTrackNm = xte,
+            etaSeconds = eta
+        )
+
+        // Auto-advance when within arrival radius
+        if (dist < ARRIVAL_RADIUS_NM) {
+            if (g.nextWaypointIndex < wps.size - 1) {
+                _guidance.value = _guidance.value.copy(
+                    nextWaypointIndex = g.nextWaypointIndex + 1
+                )
+            } else {
+                _guidance.value = _guidance.value.copy(routeComplete = true)
+            }
+        }
     }
 }
