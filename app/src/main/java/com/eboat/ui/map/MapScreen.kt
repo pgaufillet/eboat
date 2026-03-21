@@ -76,6 +76,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var boatMarker by remember { mutableStateOf<Marker?>(null) }
     val waypointMarkers = remember { mutableMapOf<Long, Marker>() }
     var routePolyline by remember { mutableStateOf<Polyline?>(null) }
+    var activeLegPolyline by remember { mutableStateOf<Polyline?>(null) }
 
     // Waypoint creation dialog
     var showWaypointDialog by remember { mutableStateOf(false) }
@@ -178,6 +179,24 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             )
         } else {
             routePolyline = null
+        }
+    }
+
+    // Draw active leg: boat position to next waypoint
+    LaunchedEffect(guidance.active, guidance.nextWaypointIndex, boatState.latitude, boatState.longitude, activeRouteWaypoints, mapLibreMap) {
+        val map = mapLibreMap ?: return@LaunchedEffect
+        activeLegPolyline?.let { map.removePolyline(it) }
+        activeLegPolyline = null
+        if (guidance.active && !guidance.routeComplete && boatState.hasPosition && activeRouteWaypoints.isNotEmpty()) {
+            val idx = guidance.nextWaypointIndex.coerceIn(0, activeRouteWaypoints.size - 1)
+            val target = activeRouteWaypoints[idx]
+            activeLegPolyline = map.addPolyline(
+                PolylineOptions()
+                    .add(LatLng(boatState.latitude, boatState.longitude))
+                    .add(LatLng(target.latitude, target.longitude))
+                    .color(android.graphics.Color.argb(140, 230, 57, 70))
+                    .width(3f)
+            )
         }
     }
 
