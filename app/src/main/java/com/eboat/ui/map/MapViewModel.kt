@@ -8,10 +8,12 @@ import com.eboat.data.location.LocationRepository
 import com.eboat.data.offline.DownloadProgress
 import com.eboat.data.offline.OfflineRegionInfo
 import com.eboat.data.offline.OfflineRepository
+import com.eboat.domain.model.AnchorState
 import com.eboat.domain.model.BoatState
 import com.eboat.domain.model.GuidanceState
 import com.eboat.domain.model.Route
 import com.eboat.domain.model.Waypoint
+import com.eboat.service.AnchorAlarmService
 import com.eboat.domain.navigation.bearingDeg
 import com.eboat.domain.navigation.crossTrackNm
 import com.eboat.domain.navigation.distanceNm
@@ -65,6 +67,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             locationRepository.observeLocation().collect { state ->
                 _boatState.value = state
                 updateGuidance(state)
+                updateAnchorAlarm(state)
             }
         }
     }
@@ -124,6 +127,63 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         _activeRoute.value = null
         _activeRouteWaypoints.value = emptyList()
         _guidance.value = GuidanceState()
+    }
+
+    // --- Anchor alarm ---
+
+    private val _anchorState = MutableStateFlow(AnchorState())
+    val anchorState: StateFlow<AnchorState> = _anchorState.asStateFlow()
+
+    fun dropAnchor(radiusMeters: Int = 50) {
+        val boat = _boatState.value
+        if (!boat.hasPosition) return
+        _anchorState.value = AnchorState(
+            active = true,
+            latitude = boat.latitude,
+            longitude = boat.longitude,
+            radiusMeters = radiusMeters
+        )
+        AnchorAlarmService.start(getApplication())
+    }
+
+    fun liftAnchor() {
+        _anchorState.value = AnchorState()
+        val app = getApplication<Application>()
+        AnchorAlarmService.clearAlarm(app)
+        AnchorAlarmService.stop(app)
+    }
+
+    fun setAnchorRadius(meters: Int) {
+        val state = _anchorState.value
+        if (state.active) {
+            _anchorState.value = state.copy(radiusMeters = meters)
+            // Clear alarm if we're now back within radius
+            if (state.currentDistanceMeters <= meters) {
+                _anchorState.value = _anchorState.value.copy(isDragging = false)
+                AnchorAlarmService.clearAlarm(getApplication())
+            }
+        }
+    }
+
+    private fun updateAnchorAlarm(boat: BoatState) {
+        val anchor = _anchorState.value
+        if (!anchor.active || !boat.hasPosition) return
+
+        val distNm = distanceNm(boat.latitude, boat.longitude, anchor.latitude, anchor.longitude)
+        val distMeters = distNm * 1852.0
+        val wasDragging = anchor.isDragging
+        val isDragging = distMeters > anchor.radiusMeters
+
+        _anchorState.value = anchor.copy(
+            currentDistanceMeters = distMeters,
+            isDragging = isDragging
+        )
+
+        if (isDragging && !wasDragging) {
+            AnchorAlarmService.triggerAlarm(getApplication())
+        } else if (!isDragging && wasDragging) {
+            AnchorAlarmService.clearAlarm(getApplication())
+        }
     }
 
     // --- Offline ---

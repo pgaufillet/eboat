@@ -44,7 +44,9 @@ import com.eboat.R
 import com.eboat.domain.model.GuidanceState
 import com.eboat.domain.model.Route
 import com.eboat.domain.model.Waypoint
+import com.eboat.domain.model.AnchorState
 import org.maplibre.android.annotations.IconFactory
+import org.maplibre.android.annotations.PolygonOptions
 import org.maplibre.android.annotations.Marker
 import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.annotations.Polyline
@@ -65,6 +67,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val activeRoute by viewModel.activeRoute.collectAsState()
     val guidance by viewModel.guidance.collectAsState()
     val activeRouteWaypoints by viewModel.activeRouteWaypoints.collectAsState()
+    val anchorState by viewModel.anchorState.collectAsState()
     val offlineRegions by viewModel.offlineRegions.collectAsState()
     val downloadProgress by viewModel.downloadProgress.collectAsState()
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
@@ -90,6 +93,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 
     // Route list dialog
     var showRouteList by remember { mutableStateOf(false) }
+
+    // Anchor
+    var showAnchorDialog by remember { mutableStateOf(false) }
+    var anchorCircle by remember { mutableStateOf<org.maplibre.android.annotations.Polygon?>(null) }
 
     // Offline dialog
     var showOfflineDialog by remember { mutableStateOf(false) }
@@ -161,6 +168,39 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             )
         } else {
             routePolyline = null
+        }
+    }
+
+    // Draw anchor circle
+    LaunchedEffect(anchorState.active, anchorState.latitude, anchorState.longitude, anchorState.radiusMeters, mapLibreMap) {
+        val map = mapLibreMap ?: return@LaunchedEffect
+        anchorCircle?.let { map.removePolygon(it) }
+        if (anchorState.active) {
+            val center = LatLng(anchorState.latitude, anchorState.longitude)
+            val radiusDeg = anchorState.radiusMeters / 111_320.0
+            val points = (0..72).map { i ->
+                val angle = Math.toRadians(i * 5.0)
+                LatLng(
+                    center.latitude + radiusDeg * Math.cos(angle),
+                    center.longitude + radiusDeg * Math.sin(angle) / Math.cos(Math.toRadians(center.latitude))
+                )
+            }
+            val fillColor = if (anchorState.isDragging)
+                android.graphics.Color.argb(60, 230, 57, 70)
+            else
+                android.graphics.Color.argb(40, 0, 119, 182)
+            val strokeColor = if (anchorState.isDragging)
+                android.graphics.Color.parseColor("#E63946")
+            else
+                android.graphics.Color.parseColor("#0077B6")
+            anchorCircle = map.addPolygon(
+                PolygonOptions()
+                    .addAll(points)
+                    .fillColor(fillColor)
+                    .strokeColor(strokeColor)
+            )
+        } else {
+            anchorCircle = null
         }
     }
 
@@ -272,6 +312,20 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            if (anchorState.active) {
+                val bgColor = if (anchorState.isDragging) Color(0xFFE63946) else Color(0xFF2E7D32)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(bgColor.copy(alpha = 0.85f), RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    NavDataItem("\u2693", if (anchorState.isDragging) "ALARME" else "OK")
+                    NavDataItem("DIST", String.format(Locale.US, "%.0f m", anchorState.currentDistanceMeters))
+                    NavDataItem("RAYON", "${anchorState.radiusMeters} m")
+                }
+            }
             if (guidance.active && !guidance.routeComplete) {
                 GuidanceOverlay(guidance = guidance)
             }
@@ -352,6 +406,15 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 },
                 containerColor = Color(0xFF0077B6)
             ) { Text("\u2193", color = Color.White) }
+            // Anchor button
+            if (boatState.hasPosition) {
+                FloatingActionButton(
+                    onClick = { showAnchorDialog = true },
+                    containerColor = if (anchorState.active) {
+                        if (anchorState.isDragging) Color(0xFFE63946) else Color(0xFF2E7D32)
+                    } else Color(0xFF666666)
+                ) { Text("\u2693", color = Color.White) }
+            }
         }
     }
 
@@ -603,6 +666,67 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             },
             confirmButton = {
                 TextButton(onClick = { showOfflineDialog = false }) { Text("Fermer") }
+            }
+        )
+    }
+
+    // Anchor dialog
+    if (showAnchorDialog) {
+        var sliderRadius by remember { mutableStateOf(anchorState.radiusMeters.toFloat()) }
+        AlertDialog(
+            onDismissRequest = { showAnchorDialog = false },
+            title = { Text(if (anchorState.active) "Veille de mouillage" else "Mouiller l'ancre") },
+            text = {
+                Column {
+                    if (!anchorState.active) {
+                        Text("Rayon d'alarme : ${sliderRadius.toInt()} m")
+                        androidx.compose.material3.Slider(
+                            value = sliderRadius,
+                            onValueChange = { sliderRadius = it },
+                            valueRange = 20f..300f,
+                            steps = 27
+                        )
+                        Text(
+                            "L'alarme se d\u00e9clenchera si le bateau d\u00e9rive au-del\u00e0 de ce rayon.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
+                        )
+                    } else {
+                        Text("Distance : ${String.format(Locale.US, "%.0f m", anchorState.currentDistanceMeters)}")
+                        Text("Rayon : ${anchorState.radiusMeters} m")
+                        if (anchorState.isDragging) {
+                            Text("LE BATEAU D\u00c9RIVE !", color = Color(0xFFE63946),
+                                style = MaterialTheme.typography.titleMedium)
+                        }
+                        Text("\nAjuster le rayon :", modifier = Modifier.padding(top = 8.dp))
+                        sliderRadius = anchorState.radiusMeters.toFloat()
+                        androidx.compose.material3.Slider(
+                            value = sliderRadius,
+                            onValueChange = {
+                                sliderRadius = it
+                                viewModel.setAnchorRadius(it.toInt())
+                            },
+                            valueRange = 20f..300f,
+                            steps = 27
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                if (!anchorState.active) {
+                    TextButton(onClick = {
+                        viewModel.dropAnchor(sliderRadius.toInt())
+                        showAnchorDialog = false
+                    }) { Text("Mouiller") }
+                } else {
+                    TextButton(onClick = {
+                        viewModel.liftAnchor()
+                        showAnchorDialog = false
+                    }) { Text("Lever l'ancre", color = Color(0xFFE63946)) }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAnchorDialog = false }) { Text("Fermer") }
             }
         )
     }
