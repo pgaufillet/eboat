@@ -300,8 +300,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                             .zoom(10.0)
                             .build()
                         map.uiSettings.isCompassEnabled = true
-                        map.uiSettings.setCompassGravity(android.view.Gravity.TOP or android.view.Gravity.START)
-                        map.uiSettings.setCompassMargins(32, 120, 0, 0)
+                        map.uiSettings.compassGravity = android.view.Gravity.TOP or android.view.Gravity.START
+                        map.uiSettings.setCompassMargins(40, 140, 0, 0)
+                        map.uiSettings.setCompassFadeFacingNorth(false)
                         map.uiSettings.isRotateGesturesEnabled = true
                         map.uiSettings.isZoomGesturesEnabled = true
 
@@ -636,7 +637,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         editCoords = !editCoords
                         editLat = wp.latitude.toString()
                         editLon = wp.longitude.toString()
-                    }) { Text("Coordonn\u00e9es") }
+                    }) { Text("Coords") }
+                    TextButton(onClick = {
+                        viewModel.fetchWeather(wp.latitude, wp.longitude)
+                        waypointToAct = null
+                        showWeatherDialog = true
+                    }) { Text("M\u00e9t\u00e9o") }
                     TextButton(onClick = { waypointToAct = null }) { Text("Fermer") }
                 }
             }
@@ -987,8 +993,15 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     } else if (data.forecasts.isEmpty()) {
                         Text("Pas de donn\u00e9es m\u00e9t\u00e9o")
                     } else {
+                        // Show position context
+                        Text(
+                            "${formatCoordinate(data.latitude, true)} ${formatCoordinate(data.longitude, false)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
                         val timeFormat = java.text.SimpleDateFormat("EEE HH:mm", Locale.getDefault())
-                        // Show next 24h, every 3h
                         val now = System.currentTimeMillis()
                         val filtered = data.forecasts.filter { it.time >= now }.take(8)
                         Row(modifier = Modifier.fillMaxWidth(),
@@ -1016,10 +1029,29 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                             }
                         }
                     }
+
+                    // Quick access to weather at waypoints
+                    if (waypoints.isNotEmpty()) {
+                        Text("M\u00e9t\u00e9o aux waypoints :",
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+                        waypoints.take(5).forEach { wp ->
+                            TextButton(onClick = {
+                                viewModel.fetchWeather(wp.latitude, wp.longitude)
+                            }) { Text(wp.name, style = MaterialTheme.typography.bodySmall) }
+                        }
+                    }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { showWeatherDialog = false }) { Text("Fermer") }
+            },
+            dismissButton = {
+                if (boatState.hasPosition) {
+                    TextButton(onClick = { viewModel.fetchWeatherAtBoat() }) {
+                        Text("Position bateau")
+                    }
+                }
             }
         )
     }
