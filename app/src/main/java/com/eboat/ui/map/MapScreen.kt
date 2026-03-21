@@ -30,11 +30,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.maplibre.android.MapLibre
+import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.annotations.Marker
 import java.util.Locale
 
 @Composable
@@ -44,6 +46,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val isTracking by viewModel.isTracking.collectAsState()
     var permissionGranted by remember { mutableStateOf(false) }
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
+    var boatMarker by remember { mutableStateOf<Marker?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -63,13 +66,22 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         )
     }
 
-    // Center map on boat when position updates
+    // Update boat marker and center map when position updates
     LaunchedEffect(boatState.hasPosition, boatState.latitude, boatState.longitude) {
+        val map = mapLibreMap ?: return@LaunchedEffect
         if (boatState.hasPosition) {
-            mapLibreMap?.animateCamera(
-                CameraUpdateFactory.newLatLng(
-                    LatLng(boatState.latitude, boatState.longitude)
-                ),
+            val position = LatLng(boatState.latitude, boatState.longitude)
+            if (boatMarker == null) {
+                boatMarker = map.addMarker(
+                    MarkerOptions()
+                        .position(position)
+                        .title("eboat")
+                )
+            } else {
+                boatMarker?.position = position
+            }
+            map.animateCamera(
+                CameraUpdateFactory.newLatLng(position),
                 1_000
             )
         }
