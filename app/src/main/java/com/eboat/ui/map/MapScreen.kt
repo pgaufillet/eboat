@@ -146,6 +146,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var bearingPointA by remember { mutableStateOf<LatLng?>(null) }
     var bearingPointB by remember { mutableStateOf<LatLng?>(null) }
     var bearingLine by remember { mutableStateOf<Polyline?>(null) }
+    var bearingMarkerA by remember { mutableStateOf<Marker?>(null) }
+    var bearingMarkerB by remember { mutableStateOf<Marker?>(null) }
 
     // Tide dialog
     var showTideDialog by remember { mutableStateOf(false) }
@@ -522,11 +524,21 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 
                         map.addOnMapLongClickListener { latLng ->
                             if (bearingMode) {
+                                val bearingIcon = IconFactory.getInstance(ctx).fromBitmap(
+                                    ContextCompat.getDrawable(ctx, R.drawable.ic_bearing_point)!!.toBitmap(48, 48)
+                                )
                                 if (bearingPointA == null) {
                                     bearingPointA = latLng
+                                    bearingMarkerA?.let { map.removeMarker(it) }
+                                    bearingMarkerA = map.addMarker(
+                                        MarkerOptions().position(latLng).title("A").icon(bearingIcon)
+                                    )
                                 } else {
                                     bearingPointB = latLng
-                                    // Draw bearing line
+                                    bearingMarkerB?.let { map.removeMarker(it) }
+                                    bearingMarkerB = map.addMarker(
+                                        MarkerOptions().position(latLng).title("B").icon(bearingIcon)
+                                    )
                                     bearingLine?.let { map.removePolyline(it) }
                                     bearingLine = map.addPolyline(
                                         PolylineOptions()
@@ -684,10 +696,14 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 TextButton(onClick = {
                     bearingPointA = null; bearingPointB = null
                     bearingLine?.let { mapLibreMap?.removePolyline(it) }; bearingLine = null
+                    bearingMarkerA?.let { mapLibreMap?.removeMarker(it) }; bearingMarkerA = null
+                    bearingMarkerB?.let { mapLibreMap?.removeMarker(it) }; bearingMarkerB = null
                 }) { Text("Reset", color = Color.White) }
                 TextButton(onClick = {
                     bearingMode = false; bearingPointA = null; bearingPointB = null
                     bearingLine?.let { mapLibreMap?.removePolyline(it) }; bearingLine = null
+                    bearingMarkerA?.let { mapLibreMap?.removeMarker(it) }; bearingMarkerA = null
+                    bearingMarkerB?.let { mapLibreMap?.removeMarker(it) }; bearingMarkerB = null
                 }) { Text("Fermer", color = Color.White) }
             }
         }
