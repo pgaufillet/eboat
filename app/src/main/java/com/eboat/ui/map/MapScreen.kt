@@ -300,6 +300,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                             .zoom(10.0)
                             .build()
                         map.uiSettings.isCompassEnabled = true
+                        map.uiSettings.setCompassGravity(android.view.Gravity.TOP or android.view.Gravity.START)
+                        map.uiSettings.setCompassMargins(32, 120, 0, 0)
                         map.uiSettings.isRotateGesturesEnabled = true
                         map.uiSettings.isZoomGesturesEnabled = true
 
