@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.maplibre.android.MapLibre
+import org.maplibre.android.annotations.IconFactory
 import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -37,6 +38,12 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.annotations.Marker
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Matrix
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
+import com.eboat.R
 import java.util.Locale
 
 @Composable
@@ -67,19 +74,22 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     }
 
     // Update boat marker and center map when position updates
-    LaunchedEffect(boatState.hasPosition, boatState.latitude, boatState.longitude) {
+    LaunchedEffect(boatState.hasPosition, boatState.latitude, boatState.longitude, boatState.courseOverGround) {
         val map = mapLibreMap ?: return@LaunchedEffect
         if (boatState.hasPosition) {
             val position = LatLng(boatState.latitude, boatState.longitude)
-            if (boatMarker == null) {
-                boatMarker = map.addMarker(
-                    MarkerOptions()
-                        .position(position)
-                        .title("eboat")
-                )
-            } else {
-                boatMarker?.position = position
-            }
+            val baseBitmap = ContextCompat.getDrawable(context, R.drawable.ic_boat)!!
+                .toBitmap(96, 96)
+            val rotated = rotateBitmap(baseBitmap, boatState.courseOverGround)
+            val icon = IconFactory.getInstance(context).fromBitmap(rotated)
+
+            boatMarker?.let { map.removeMarker(it) }
+            boatMarker = map.addMarker(
+                MarkerOptions()
+                    .position(position)
+                    .title("eboat")
+                    .icon(icon)
+            )
             map.animateCamera(
                 CameraUpdateFactory.newLatLng(position),
                 1_000
@@ -185,6 +195,11 @@ private fun NavDataItem(label: String, value: String) {
             color = Color.White
         )
     }
+}
+
+private fun rotateBitmap(source: Bitmap, degrees: Float): Bitmap {
+    val matrix = Matrix().apply { postRotate(degrees, source.width / 2f, source.height / 2f) }
+    return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
 }
 
 private fun formatCoordinate(value: Double, isLatitude: Boolean): String {
