@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
@@ -1292,114 +1293,160 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     if (showMenu) {
         AlertDialog(
             onDismissRequest = { showMenu = false },
-            containerColor = Color(0xFF1B2B3D),
+            containerColor = Color(0xFF152233),
             titleContentColor = Color.White,
             title = {
-                Text("eboat", style = MaterialTheme.typography.titleLarge)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(Color(0xFF0077B6), RoundedCornerShape(4.dp))
+                    )
+                    Text("  eboat", style = MaterialTheme.typography.titleLarge,
+                        color = Color.White)
+                }
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    data class MenuItem(val icon: String, val label: String, val sub: String, val action: () -> Unit)
-                    val items = listOf(
-                        MenuItem("\uD83D\uDDFA", "Routes", if (activeRoute != null) activeRoute!!.name else "${routes.size} routes") {
-                            showMenu = false; showRouteList = true
-                        },
-                        MenuItem("\u2693", "Mouillage", if (anchorState.active) "Actif \u2022 ${anchorState.radiusMeters}m" else "Inactif") {
-                            showMenu = false; showAnchorDialog = true
-                        },
-                        MenuItem("\uD83C\uDF0A", "Mar\u00e9es", "PM / BM") {
-                            showMenu = false; viewModel.fetchTidesAtBoat(); showTideDialog = true
-                        },
-                        MenuItem("\uD83D\uDCA8", "M\u00e9t\u00e9o & Overlay", "${weatherLayers.size} couches") {
-                            showMenu = false; viewModel.fetchWeatherAtBoat(); showWeatherDialog = true
-                        },
-                        MenuItem("\u26A0", "Zones d'alerte", "${alertZones.size} zones") {
-                            showMenu = false; showAlertZoneDialog = true
-                        },
-                        MenuItem("\uD83D\uDEE5", "AIS", if (aisConnected) "${aisTargets.size} cibles" else "D\u00e9connect\u00e9") {
-                            showMenu = false; showAisDialog = true
-                        },
-                        MenuItem("\uD83D\uDCDD", "Journal de bord", if (tripRecording) "Enregistrement..." else "${tripIds.size} trajets") {
-                            showMenu = false; showTripDialog = true
-                        },
-                        MenuItem("\uD83E\uDDED", "Compas de rel\u00e8vement", "Mesurer angles") {
-                            showMenu = false; bearingMode = true; bearingPointA = null; bearingPointB = null
-                        },
-                        MenuItem("\uD83D\uDCE5", "Cartes hors-ligne", "${offlineRegions.size} zones") {
-                            showMenu = false; viewModel.refreshOfflineRegions(); showOfflineDialog = true
-                        }
-                    )
+                @Composable
+                fun MenuSection(title: String) {
+                    Text(title.uppercase(),
+                        color = Color(0xFF4FC3F7),
+                        style = MaterialTheme.typography.labelSmall,
+                        letterSpacing = 1.5.sp,
+                        modifier = Modifier.padding(top = 14.dp, bottom = 6.dp, start = 4.dp))
+                }
 
-                    items.forEach { item ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { item.action() }
-                                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(item.icon, style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(end = 16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(item.label, color = Color.White,
-                                    style = MaterialTheme.typography.bodyLarge)
-                                Text(item.sub, color = Color.White.copy(alpha = 0.6f),
-                                    style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
+                @Composable
+                fun PrimaryItem(label: String, sub: String, accent: Color, action: () -> Unit) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { action() }
+                            .padding(vertical = 2.dp)
+                            .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier
+                            .size(10.dp)
+                            .background(accent, RoundedCornerShape(5.dp)))
+                        Text(label, color = Color.White,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(start = 14.dp).weight(1f))
+                        Text(sub, color = Color.White.copy(alpha = 0.45f),
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+
+                @Composable
+                fun SecondaryItem(label: String, sub: String, action: () -> Unit) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { action() }
+                            .padding(vertical = 1.dp)
+                            .padding(horizontal = 16.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(label, color = Color.White.copy(alpha = 0.85f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f))
+                        Text(sub, color = Color.White.copy(alpha = 0.35f),
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+
+                @Composable
+                fun LayerChip(label: String, active: Boolean, action: () -> Unit) {
+                    val bg = if (active) Color(0xFF0077B6).copy(alpha = 0.3f) else Color.White.copy(alpha = 0.08f)
+                    val border = if (active) Color(0xFF0077B6) else Color.Transparent
+                    Box(
+                        modifier = Modifier
+                            .clickable { action() }
+                            .background(bg, RoundedCornerShape(20.dp))
+                            .then(
+                                if (active) Modifier.background(bg, RoundedCornerShape(20.dp))
+                                else Modifier
+                            )
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(label,
+                            color = if (active) Color(0xFF4FC3F7) else Color.White.copy(alpha = 0.6f),
+                            style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+
+                Column {
+                    MenuSection("Navigation")
+                    PrimaryItem("Routes",
+                        if (activeRoute != null) activeRoute!!.name else "${routes.size}",
+                        Color(0xFFE63946)) {
+                        showMenu = false; showRouteList = true
+                    }
+                    PrimaryItem("Mouillage",
+                        if (anchorState.active) "${anchorState.radiusMeters}m" else "---",
+                        if (anchorState.isDragging) Color(0xFFE63946)
+                        else if (anchorState.active) Color(0xFF2E7D32)
+                        else Color(0xFF666666)) {
+                        showMenu = false; showAnchorDialog = true
+                    }
+                    PrimaryItem("M\u00e9t\u00e9o",
+                        if (weatherLayers.isNotEmpty()) "${weatherLayers.size} couches" else "---",
+                        Color(0xFF0077B6)) {
+                        showMenu = false; viewModel.fetchWeatherAtBoat(); showWeatherDialog = true
                     }
 
-                    // Layer toggles section
-                    Text("Couches", color = Color.White.copy(alpha = 0.5f),
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(top = 12.dp, start = 4.dp, bottom = 4.dp))
+                    MenuSection("Donn\u00e9es")
+                    SecondaryItem("Mar\u00e9es", "PM / BM") {
+                        showMenu = false; viewModel.fetchTidesAtBoat(); showTideDialog = true
+                    }
+                    SecondaryItem("AIS",
+                        if (aisConnected) "${aisTargets.size} cibles" else "---") {
+                        showMenu = false; showAisDialog = true
+                    }
+                    SecondaryItem("Zones d'alerte", "${alertZones.size}") {
+                        showMenu = false; showAlertZoneDialog = true
+                    }
+
+                    MenuSection("Outils")
+                    SecondaryItem("Compas", "Rel\u00e8vement & distance") {
+                        showMenu = false; bearingMode = true; bearingPointA = null; bearingPointB = null
+                    }
+                    SecondaryItem("Journal de bord",
+                        if (tripRecording) "REC" else "${tripIds.size} trajets") {
+                        showMenu = false; showTripDialog = true
+                    }
+                    SecondaryItem("Cartes hors-ligne", "${offlineRegions.size} zones") {
+                        showMenu = false; viewModel.refreshOfflineRegions(); showOfflineDialog = true
+                    }
+
+                    MenuSection("Couches")
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        val chipMod = Modifier
-                            .weight(1f)
-                            .background(
-                                Color.White.copy(alpha = 0.12f),
-                                RoundedCornerShape(8.dp)
-                            )
-                            .padding(vertical = 10.dp)
-
-                        Column(
-                            modifier = chipMod.clickable { viewModel.toggleDepthLayer() },
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(if (depthLayerVisible) "\u2611" else "\u2610",
-                                color = Color.White, style = MaterialTheme.typography.bodyLarge)
-                            Text("Sondes", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                        }
-                        Column(
-                            modifier = chipMod.clickable {
-                                val allTypes = com.eboat.domain.model.WeatherLayerType.values().toSet()
-                                if (weatherLayers.isEmpty()) {
-                                    allTypes.forEach { viewModel.toggleWeatherLayer(it) }
-                                    viewModel.fetchWeatherOverlay()
-                                } else viewModel.clearWeatherLayers()
-                            },
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(if (weatherLayers.isNotEmpty()) "\u2611" else "\u2610",
-                                color = Color.White, style = MaterialTheme.typography.bodyLarge)
-                            Text("M\u00e9t\u00e9o", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                        LayerChip("Sondes", depthLayerVisible) { viewModel.toggleDepthLayer() }
+                        LayerChip("M\u00e9t\u00e9o", weatherLayers.isNotEmpty()) {
+                            val allTypes = com.eboat.domain.model.WeatherLayerType.values().toSet()
+                            if (weatherLayers.isEmpty()) {
+                                allTypes.forEach { viewModel.toggleWeatherLayer(it) }
+                                viewModel.fetchWeatherOverlay()
+                            } else viewModel.clearWeatherLayers()
                         }
                     }
 
-                    // Help link
+                    // Help
                     TextButton(
                         onClick = { showMenu = false; showHelp = true },
-                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)
-                    ) { Text("? Aide", color = Color.White.copy(alpha = 0.5f)) }
+                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 10.dp)
+                    ) { Text("Aide", color = Color.White.copy(alpha = 0.35f),
+                        style = MaterialTheme.typography.labelMedium) }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { showMenu = false }) {
-                    Text("Fermer", color = Color.White.copy(alpha = 0.7f))
+                    Text("Fermer", color = Color.White.copy(alpha = 0.5f))
                 }
             }
         )
