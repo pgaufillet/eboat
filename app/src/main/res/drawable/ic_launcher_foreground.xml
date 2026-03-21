@@ -1,0 +1,41 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Water waves -->
+    <path
+        android:pathData="M20,72 Q30,68 40,72 Q50,76 60,72 Q70,68 80,72 Q90,76 95,72"
+        android:strokeColor="#4FC3F7"
+        android:strokeWidth="2.5"
+        android:fillColor="@android:color/transparent"/>
+    <path
+        android:pathData="M15,78 Q25,74 35,78 Q45,82 55,78 Q65,74 75,78 Q85,82 93,78"
+        android:strokeColor="#29B6F6"
+        android:strokeWidth="2"
+        android:fillColor="@android:color/transparent"/>
+    <!-- Hull -->
+    <path
+        android:pathData="M30,66 L38,66 L54,66 L78,66 L74,58 L54,58 L38,58 L34,58 Z"
+        android:fillColor="#FFFFFF"/>
+    <path
+        android:pathData="M34,58 L30,66 L78,66 L74,58"
+        android:fillColor="#E0E0E0"/>
+    <!-- Mast -->
+    <path
+        android:pathData="M52,24 L52,58"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.5"/>
+    <!-- Main sail -->
+    <path
+        android:pathData="M54,28 L54,56 L72,56 Z"
+        android:fillColor="#FFFFFF"/>
+    <!-- Jib sail -->
+    <path
+        android:pathData="M50,30 L50,54 L36,54 Z"
+        android:fillColor="#E63946"/>
+    <!-- Compass rose accent -->
+    <path
+        android:pathData="M52,24 L50,20 L52,16 L54,20 Z"
+        android:fillColor="#E63946"/>
+</vector>
