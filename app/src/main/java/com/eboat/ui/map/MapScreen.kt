@@ -55,7 +55,6 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     }
 
     LaunchedEffect(Unit) {
-        MapLibre.getInstance(context)
         permissionLauncher.launch(
             arrayOf(
                 Manifest.permission.ACCESS_FINE_LOCATION,
