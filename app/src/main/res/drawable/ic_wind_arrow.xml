@@ -1,0 +1,17 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Arrow pointing UP (north), rotation handled by MapLibre -->
+    <path
+        android:pathData="M12,2 L8,14 L12,11 L16,14 Z"
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#333333"
+        android:strokeWidth="0.5"/>
+    <!-- Tail -->
+    <path
+        android:pathData="M12,11 L12,22"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"/>
+</vector>

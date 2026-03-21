@@ -13,6 +13,8 @@ import com.eboat.data.tide.TideRepository
 import com.eboat.data.weather.WeatherRepository
 import com.eboat.domain.model.AisTarget
 import com.eboat.domain.model.TideData
+import com.eboat.domain.model.WeatherLayerType
+import com.eboat.domain.navigation.corridorGrid
 import com.eboat.domain.model.TripLogEntry
 import com.eboat.domain.model.WeatherData
 import com.eboat.domain.model.AlertZone
@@ -166,6 +168,12 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val _weatherData = MutableStateFlow<WeatherData?>(null)
     val weatherData: StateFlow<WeatherData?> = _weatherData.asStateFlow()
 
+    private val _weatherGrid = MutableStateFlow<List<WeatherData>>(emptyList())
+    val weatherGrid: StateFlow<List<WeatherData>> = _weatherGrid.asStateFlow()
+
+    private val _weatherLayers = MutableStateFlow<Set<WeatherLayerType>>(emptySet())
+    val weatherLayers: StateFlow<Set<WeatherLayerType>> = _weatherLayers.asStateFlow()
+
     fun fetchWeather(lat: Double, lon: Double) {
         viewModelScope.launch {
             _weatherData.value = weatherRepo.fetchForecast(lat, lon)
@@ -175,6 +183,34 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun fetchWeatherAtBoat() {
         val boat = _boatState.value
         if (boat.hasPosition) fetchWeather(boat.latitude, boat.longitude)
+    }
+
+    fun toggleWeatherLayer(type: WeatherLayerType) {
+        val current = _weatherLayers.value.toMutableSet()
+        if (type in current) current.remove(type) else current.add(type)
+        _weatherLayers.value = current
+    }
+
+    fun clearWeatherLayers() {
+        _weatherLayers.value = emptySet()
+        _weatherGrid.value = emptyList()
+    }
+
+    fun fetchWeatherOverlay() {
+        viewModelScope.launch {
+            val wps = _activeRouteWaypoints.value
+            val gridPoints = if (wps.size >= 2) {
+                corridorGrid(wps.map { it.latitude to it.longitude })
+            } else {
+                val boat = _boatState.value
+                if (boat.hasPosition) {
+                    corridorGrid(listOf(boat.latitude to boat.longitude))
+                } else emptyList()
+            }
+            if (gridPoints.isNotEmpty()) {
+                _weatherGrid.value = weatherRepo.fetchCorridor(gridPoints)
+            }
+        }
     }
 
     // --- AIS ---

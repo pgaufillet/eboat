@@ -65,6 +65,70 @@ fun isPointInPolygon(lat: Double, lon: Double, polygon: List<Pair<Double, Double
     return inside
 }
 
+/** Destination point given start, bearing (degrees) and distance (NM) — haversine inverse */
+fun destinationPoint(lat: Double, lon: Double, bearingDeg: Double, distanceNm: Double): Pair<Double, Double> {
+    val d = distanceNm * NM_IN_METERS / EARTH_RADIUS_M
+    val brng = Math.toRadians(bearingDeg)
+    val rLat = Math.toRadians(lat)
+    val rLon = Math.toRadians(lon)
+    val lat2 = asin(sin(rLat) * cos(d) + cos(rLat) * sin(d) * cos(brng))
+    val lon2 = rLon + atan2(sin(brng) * sin(d) * cos(rLat), cos(d) - sin(rLat) * sin(lat2))
+    return Math.toDegrees(lat2) to Math.toDegrees(lon2)
+}
+
+/**
+ * Generate a grid of sample points in a corridor around waypoints.
+ * @param waypoints Route waypoints (lat, lon pairs)
+ * @param radiusNm Corridor half-width in NM (default 10)
+ * @param spacingNm Distance between samples along the route in NM (default 10)
+ * @return List of (lat, lon) sample points
+ */
+fun corridorGrid(
+    waypoints: List<Pair<Double, Double>>,
+    radiusNm: Double = 10.0,
+    spacingNm: Double = 10.0
+): List<Pair<Double, Double>> {
+    if (waypoints.isEmpty()) return emptyList()
+
+    // Single point: 3x3 grid around it
+    if (waypoints.size == 1) {
+        val (lat, lon) = waypoints[0]
+        val offsets = listOf(-radiusNm, 0.0, radiusNm)
+        return offsets.flatMap { dLat ->
+            offsets.map { dLon ->
+                val p = destinationPoint(lat, lon, if (dLat >= 0) 0.0 else 180.0, kotlin.math.abs(dLat))
+                destinationPoint(p.first, p.second, if (dLon >= 0) 90.0 else 270.0, kotlin.math.abs(dLon))
+            }
+        }
+    }
+
+    val points = mutableSetOf<Pair<Double, Double>>()
+
+    for (i in 0 until waypoints.size - 1) {
+        val (lat1, lon1) = waypoints[i]
+        val (lat2, lon2) = waypoints[i + 1]
+        val legDist = distanceNm(lat1, lon1, lat2, lon2)
+        val legBearing = bearingDeg(lat1, lon1, lat2, lon2)
+        val perpLeft = (legBearing - 90 + 360) % 360
+        val perpRight = (legBearing + 90) % 360
+        val steps = (legDist / spacingNm).toInt().coerceAtLeast(1)
+
+        for (s in 0..steps) {
+            val frac = s.toDouble() / steps
+            val along = frac * legDist
+            val center = destinationPoint(lat1, lon1, legBearing, along)
+
+            // Center point
+            points.add(center)
+            // Left and right offsets
+            points.add(destinationPoint(center.first, center.second, perpLeft, radiusNm))
+            points.add(destinationPoint(center.first, center.second, perpRight, radiusNm))
+        }
+    }
+
+    return points.toList()
+}
+
 /** ETA in seconds given distance in NM and speed in knots. Returns null if speed ~0. */
 fun etaSeconds(distanceNm: Double, speedKnots: Float): Long? {
     if (speedKnots < 0.5f) return null

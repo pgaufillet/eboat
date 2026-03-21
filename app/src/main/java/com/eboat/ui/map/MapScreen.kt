@@ -44,6 +44,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eboat.R
 import com.eboat.domain.model.GuidanceState
+import com.eboat.domain.model.WeatherLayerType
 import com.eboat.domain.model.Route
 import com.eboat.domain.model.Waypoint
 import com.eboat.domain.model.AnchorState
@@ -117,7 +118,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 
     // Weather
     val weatherData by viewModel.weatherData.collectAsState()
+    val weatherGrid by viewModel.weatherGrid.collectAsState()
+    val weatherLayers by viewModel.weatherLayers.collectAsState()
     var showWeatherDialog by remember { mutableStateOf(false) }
+    var weatherLayersInitialized by remember { mutableStateOf(false) }
 
     // AIS
     val aisTargets by viewModel.aisTargets.collectAsState()
@@ -287,6 +291,194 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         }
     }
 
+    // Weather overlay layers
+    LaunchedEffect(weatherGrid, weatherLayers, mapLibreMap) {
+        val map = mapLibreMap ?: return@LaunchedEffect
+        map.getStyle { style ->
+            // Build wave height cells as GeoJSON
+            val now = System.currentTimeMillis()
+            val cellSizeDeg = 0.08 // ~5 NM at mid-latitudes
+
+            if (weatherLayers.isNotEmpty() && weatherGrid.isNotEmpty()) {
+                val waveFeatures = mutableListOf<org.maplibre.geojson.Feature>()
+                val windFeatures = mutableListOf<org.maplibre.geojson.Feature>()
+                val swellFeatures = mutableListOf<org.maplibre.geojson.Feature>()
+                val pressureFeatures = mutableListOf<org.maplibre.geojson.Feature>()
+
+                for (wd in weatherGrid) {
+                    val forecast = wd.forecasts.firstOrNull { it.time >= now } ?: wd.forecasts.lastOrNull() ?: continue
+                    val lat = wd.latitude
+                    val lon = wd.longitude
+
+                    // Cell polygon
+                    val cellCoords = listOf(
+                        org.maplibre.geojson.Point.fromLngLat(lon - cellSizeDeg, lat - cellSizeDeg),
+                        org.maplibre.geojson.Point.fromLngLat(lon + cellSizeDeg, lat - cellSizeDeg),
+                        org.maplibre.geojson.Point.fromLngLat(lon + cellSizeDeg, lat + cellSizeDeg),
+                        org.maplibre.geojson.Point.fromLngLat(lon - cellSizeDeg, lat + cellSizeDeg),
+                        org.maplibre.geojson.Point.fromLngLat(lon - cellSizeDeg, lat - cellSizeDeg)
+                    )
+                    val polygon = org.maplibre.geojson.Polygon.fromLngLats(listOf(cellCoords))
+                    val point = org.maplibre.geojson.Point.fromLngLat(lon, lat)
+
+                    if (WeatherLayerType.WAVE_HEIGHT in weatherLayers) {
+                        val f = org.maplibre.geojson.Feature.fromGeometry(polygon)
+                        f.addNumberProperty("waveHeight", forecast.waveHeightM)
+                        waveFeatures.add(f)
+                    }
+                    if (WeatherLayerType.WIND in weatherLayers) {
+                        val f = org.maplibre.geojson.Feature.fromGeometry(point)
+                        f.addNumberProperty("windSpeed", forecast.windSpeedKnots)
+                        f.addNumberProperty("windDirection", forecast.windDirectionDeg)
+                        f.addStringProperty("windLabel", String.format(java.util.Locale.US, "%.0f", forecast.windSpeedKnots))
+                        windFeatures.add(f)
+                    }
+                    if (WeatherLayerType.SWELL in weatherLayers) {
+                        val f = org.maplibre.geojson.Feature.fromGeometry(point)
+                        f.addNumberProperty("swellHeight", forecast.swellHeightM)
+                        f.addNumberProperty("swellDirection", forecast.swellDirectionDeg)
+                        f.addStringProperty("swellLabel", String.format(java.util.Locale.US, "%.1fm %ds", forecast.swellHeightM, forecast.swellPeriodS.toInt()))
+                        swellFeatures.add(f)
+                    }
+                    if (WeatherLayerType.PRESSURE in weatherLayers) {
+                        val f = org.maplibre.geojson.Feature.fromGeometry(polygon)
+                        f.addNumberProperty("pressure", forecast.pressureHpa)
+                        pressureFeatures.add(f)
+                    }
+                }
+
+                // Register images if needed
+                if (!weatherLayersInitialized) {
+                    val windBmp = ContextCompat.getDrawable(context, R.drawable.ic_wind_arrow)!!.toBitmap(48, 48)
+                    val swellBmp = ContextCompat.getDrawable(context, R.drawable.ic_swell_arrow)!!.toBitmap(48, 48)
+                    style.addImage("wind-arrow", windBmp)
+                    style.addImage("swell-arrow", swellBmp)
+                    weatherLayersInitialized = true
+                }
+
+                // Update or create sources
+                fun updateOrCreateSource(id: String, fc: org.maplibre.geojson.FeatureCollection) {
+                    val existing = style.getSource(id) as? org.maplibre.android.style.sources.GeoJsonSource
+                    if (existing != null) {
+                        existing.setGeoJson(fc)
+                    } else {
+                        style.addSource(org.maplibre.android.style.sources.GeoJsonSource(id, fc))
+                    }
+                }
+
+                // Wave height fill layer
+                if (waveFeatures.isNotEmpty()) {
+                    updateOrCreateSource("weather-wave-src", org.maplibre.geojson.FeatureCollection.fromFeatures(waveFeatures))
+                    if (style.getLayer("weather-wave-layer") == null) {
+                        val layer = org.maplibre.android.style.layers.FillLayer("weather-wave-layer", "weather-wave-src")
+                        layer.setProperties(
+                            org.maplibre.android.style.layers.PropertyFactory.fillColor(
+                                org.maplibre.android.style.expressions.Expression.interpolate(
+                                    org.maplibre.android.style.expressions.Expression.linear(),
+                                    org.maplibre.android.style.expressions.Expression.get("waveHeight"),
+                                    org.maplibre.android.style.expressions.Expression.stop(0f, org.maplibre.android.style.expressions.Expression.color(android.graphics.Color.parseColor("#90CAF9"))),
+                                    org.maplibre.android.style.expressions.Expression.stop(1f, org.maplibre.android.style.expressions.Expression.color(android.graphics.Color.parseColor("#1565C0"))),
+                                    org.maplibre.android.style.expressions.Expression.stop(2f, org.maplibre.android.style.expressions.Expression.color(android.graphics.Color.parseColor("#FF9800"))),
+                                    org.maplibre.android.style.expressions.Expression.stop(3f, org.maplibre.android.style.expressions.Expression.color(android.graphics.Color.parseColor("#E63946")))
+                                )
+                            ),
+                            org.maplibre.android.style.layers.PropertyFactory.fillOpacity(0.3f)
+                        )
+                        style.addLayerBelow(layer, "openseamap-overlay")
+                    }
+                }
+
+                // Wind symbol layer
+                if (windFeatures.isNotEmpty()) {
+                    updateOrCreateSource("weather-wind-src", org.maplibre.geojson.FeatureCollection.fromFeatures(windFeatures))
+                    if (style.getLayer("weather-wind-layer") == null) {
+                        val layer = org.maplibre.android.style.layers.SymbolLayer("weather-wind-layer", "weather-wind-src")
+                        layer.setProperties(
+                            org.maplibre.android.style.layers.PropertyFactory.iconImage("wind-arrow"),
+                            org.maplibre.android.style.layers.PropertyFactory.iconRotate(org.maplibre.android.style.expressions.Expression.get("windDirection")),
+                            org.maplibre.android.style.layers.PropertyFactory.iconSize(0.7f),
+                            org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap(true),
+                            org.maplibre.android.style.layers.PropertyFactory.textField(org.maplibre.android.style.expressions.Expression.get("windLabel")),
+                            org.maplibre.android.style.layers.PropertyFactory.textSize(10f),
+                            org.maplibre.android.style.layers.PropertyFactory.textColor(android.graphics.Color.WHITE),
+                            org.maplibre.android.style.layers.PropertyFactory.textHaloColor(android.graphics.Color.BLACK),
+                            org.maplibre.android.style.layers.PropertyFactory.textHaloWidth(1.5f),
+                            org.maplibre.android.style.layers.PropertyFactory.textOffset(arrayOf(0f, 2f)),
+                            org.maplibre.android.style.layers.PropertyFactory.textAllowOverlap(true)
+                        )
+                        style.addLayer(layer)
+                    }
+                }
+
+                // Swell symbol layer
+                if (swellFeatures.isNotEmpty()) {
+                    updateOrCreateSource("weather-swell-src", org.maplibre.geojson.FeatureCollection.fromFeatures(swellFeatures))
+                    if (style.getLayer("weather-swell-layer") == null) {
+                        val layer = org.maplibre.android.style.layers.SymbolLayer("weather-swell-layer", "weather-swell-src")
+                        layer.setProperties(
+                            org.maplibre.android.style.layers.PropertyFactory.iconImage("swell-arrow"),
+                            org.maplibre.android.style.layers.PropertyFactory.iconRotate(org.maplibre.android.style.expressions.Expression.get("swellDirection")),
+                            org.maplibre.android.style.layers.PropertyFactory.iconSize(0.6f),
+                            org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap(true),
+                            org.maplibre.android.style.layers.PropertyFactory.textField(org.maplibre.android.style.expressions.Expression.get("swellLabel")),
+                            org.maplibre.android.style.layers.PropertyFactory.textSize(9f),
+                            org.maplibre.android.style.layers.PropertyFactory.textColor(android.graphics.Color.parseColor("#0077B6")),
+                            org.maplibre.android.style.layers.PropertyFactory.textHaloColor(android.graphics.Color.WHITE),
+                            org.maplibre.android.style.layers.PropertyFactory.textHaloWidth(1.5f),
+                            org.maplibre.android.style.layers.PropertyFactory.textOffset(arrayOf(0f, 2f)),
+                            org.maplibre.android.style.layers.PropertyFactory.textAllowOverlap(true)
+                        )
+                        style.addLayer(layer)
+                    }
+                }
+
+                // Pressure fill layer
+                if (pressureFeatures.isNotEmpty()) {
+                    updateOrCreateSource("weather-pressure-src", org.maplibre.geojson.FeatureCollection.fromFeatures(pressureFeatures))
+                    if (style.getLayer("weather-pressure-layer") == null) {
+                        val layer = org.maplibre.android.style.layers.FillLayer("weather-pressure-layer", "weather-pressure-src")
+                        layer.setProperties(
+                            org.maplibre.android.style.layers.PropertyFactory.fillColor(
+                                org.maplibre.android.style.expressions.Expression.interpolate(
+                                    org.maplibre.android.style.expressions.Expression.linear(),
+                                    org.maplibre.android.style.expressions.Expression.get("pressure"),
+                                    org.maplibre.android.style.expressions.Expression.stop(1000f, org.maplibre.android.style.expressions.Expression.color(android.graphics.Color.parseColor("#E63946"))),
+                                    org.maplibre.android.style.expressions.Expression.stop(1013f, org.maplibre.android.style.expressions.Expression.color(android.graphics.Color.parseColor("#FFC107"))),
+                                    org.maplibre.android.style.expressions.Expression.stop(1025f, org.maplibre.android.style.expressions.Expression.color(android.graphics.Color.parseColor("#4CAF50")))
+                                )
+                            ),
+                            org.maplibre.android.style.layers.PropertyFactory.fillOpacity(0.2f)
+                        )
+                        style.addLayerBelow(layer, "openseamap-overlay")
+                    }
+                }
+
+                // Toggle visibility for all layers
+                for (type in WeatherLayerType.values()) {
+                    val layerId = when (type) {
+                        WeatherLayerType.WIND -> "weather-wind-layer"
+                        WeatherLayerType.WAVE_HEIGHT -> "weather-wave-layer"
+                        WeatherLayerType.SWELL -> "weather-swell-layer"
+                        WeatherLayerType.PRESSURE -> "weather-pressure-layer"
+                    }
+                    style.getLayer(layerId)?.setProperties(
+                        org.maplibre.android.style.layers.PropertyFactory.visibility(
+                            if (type in weatherLayers) org.maplibre.android.style.layers.Property.VISIBLE
+                            else org.maplibre.android.style.layers.Property.NONE
+                        )
+                    )
+                }
+            } else {
+                // Hide all weather layers
+                for (layerId in listOf("weather-wave-layer", "weather-wind-layer", "weather-swell-layer", "weather-pressure-layer")) {
+                    style.getLayer(layerId)?.setProperties(
+                        org.maplibre.android.style.layers.PropertyFactory.visibility(org.maplibre.android.style.layers.Property.NONE)
+                    )
+                }
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
@@ -424,6 +616,41 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             )
         }
 
+        // Weather legend (bottom-left)
+        if (weatherLayers.isNotEmpty() && weatherGrid.isNotEmpty()) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 8.dp, bottom = 16.dp)
+                    .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
+                    .padding(8.dp)
+            ) {
+                if (WeatherLayerType.WIND in weatherLayers) {
+                    Text("Vent (kn)", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                }
+                if (WeatherLayerType.WAVE_HEIGHT in weatherLayers) {
+                    Row {
+                        listOf(
+                            Color(0xFF90CAF9) to "0",
+                            Color(0xFF1565C0) to "1m",
+                            Color(0xFFFF9800) to "2m",
+                            Color(0xFFE63946) to "3m+"
+                        ).forEach { (color, label) ->
+                            Box(modifier = Modifier.size(12.dp).background(color))
+                            Text(label, color = Color.White, style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(end = 4.dp))
+                        }
+                    }
+                }
+                if (WeatherLayerType.SWELL in weatherLayers) {
+                    Text("Houle (m/s)", color = Color(0xFF0077B6), style = MaterialTheme.typography.labelSmall)
+                }
+                if (WeatherLayerType.PRESSURE in weatherLayers) {
+                    Text("Pression (hPa)", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+
         // Guidance + Navigation overlays
         Column(
             modifier = Modifier
@@ -470,18 +697,18 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             }
         }
 
-        // Active route name
+        // Active route name — positioned below compass (top-left, offset down)
         activeRoute?.let { route ->
             Text(
-                route.name,
+                "\u25C0 ${route.name}",
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(top = 48.dp, start = 16.dp)
+                    .padding(top = 110.dp, start = 16.dp)
                     .background(Color(0xFF1B3A5C), RoundedCornerShape(8.dp))
                     .padding(horizontal = 12.dp, vertical = 6.dp)
                     .clickable { viewModel.deactivateRoute() },
                 color = Color.White,
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodySmall
             )
         }
 
@@ -643,6 +870,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         waypointToAct = null
                         showWeatherDialog = true
                     }) { Text("M\u00e9t\u00e9o") }
+                    TextButton(onClick = {
+                        viewModel.fetchTides(wp.latitude, wp.longitude)
+                        waypointToAct = null
+                        showTideDialog = true
+                    }) { Text("Mar\u00e9es") }
                     TextButton(onClick = { waypointToAct = null }) { Text("Fermer") }
                 }
             }
@@ -877,10 +1109,29 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                             }
                         }
                     }
+
+                    // Quick access to tides at waypoints
+                    if (waypoints.isNotEmpty()) {
+                        Text("Mar\u00e9es aux waypoints :",
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+                        waypoints.take(5).forEach { wp ->
+                            TextButton(onClick = {
+                                viewModel.fetchTides(wp.latitude, wp.longitude)
+                            }) { Text(wp.name, style = MaterialTheme.typography.bodySmall) }
+                        }
+                    }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { showTideDialog = false }) { Text("Fermer") }
+            },
+            dismissButton = {
+                if (boatState.hasPosition) {
+                    TextButton(onClick = { viewModel.fetchTidesAtBoat() }) {
+                        Text("Position bateau")
+                    }
+                }
             }
         )
     }
@@ -1039,6 +1290,35 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                             TextButton(onClick = {
                                 viewModel.fetchWeather(wp.latitude, wp.longitude)
                             }) { Text(wp.name, style = MaterialTheme.typography.bodySmall) }
+                        }
+                    }
+
+                    // Layer selector
+                    Text("Couches carte :",
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+                    WeatherLayerType.values().forEach { type ->
+                        val checked = type in weatherLayers
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.toggleWeatherLayer(type) }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            androidx.compose.material3.Checkbox(
+                                checked = checked,
+                                onCheckedChange = { viewModel.toggleWeatherLayer(type) }
+                            )
+                            Text(type.label, modifier = Modifier.padding(start = 8.dp))
+                        }
+                    }
+                    Row(modifier = Modifier.padding(top = 8.dp)) {
+                        TextButton(onClick = { viewModel.fetchWeatherOverlay() }) {
+                            Text("Charger overlay")
+                        }
+                        TextButton(onClick = { viewModel.clearWeatherLayers() }) {
+                            Text("Masquer tout")
                         }
                     }
                 }

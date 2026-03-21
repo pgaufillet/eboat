@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Wave-like arrow pointing UP, rotation handled by MapLibre -->
+    <path
+        android:pathData="M12,2 L7,10 L12,8 L17,10 Z"
+        android:fillColor="#0077B6"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="0.5"/>
+    <!-- Wave curves -->
+    <path
+        android:pathData="M6,16 Q9,13 12,16 Q15,19 18,16"
+        android:strokeColor="#0077B6"
+        android:strokeWidth="1.5"
+        android:fillColor="@android:color/transparent"/>
+    <path
+        android:pathData="M6,20 Q9,17 12,20 Q15,23 18,20"
+        android:strokeColor="#0077B6"
+        android:strokeWidth="1.2"
+        android:fillColor="@android:color/transparent"/>
+</vector>

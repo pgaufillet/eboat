@@ -17,6 +17,14 @@
       ],
       "tileSize": 256,
       "attribution": "&copy; OpenSeaMap contributors"
+    },
+    "openseamap-depth": {
+      "type": "raster",
+      "tiles": [
+        "https://depth.openseamap.org/depth/{z}/{x}/{y}.png"
+      ],
+      "tileSize": 256,
+      "attribution": "&copy; OpenSeaMap depth"
     }
   },
   "layers": [
@@ -26,6 +34,16 @@
       "source": "osm-raster",
       "minzoom": 0,
       "maxzoom": 18
+    },
+    {
+      "id": "depth-overlay",
+      "type": "raster",
+      "source": "openseamap-depth",
+      "minzoom": 8,
+      "maxzoom": 18,
+      "paint": {
+        "raster-opacity": 0.6
+      }
     },
     {
       "id": "openseamap-overlay",
