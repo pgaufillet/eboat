@@ -8,6 +8,13 @@ import com.eboat.data.location.LocationRepository
 import com.eboat.data.offline.DownloadProgress
 import com.eboat.data.offline.OfflineRegionInfo
 import com.eboat.data.offline.OfflineRepository
+import com.eboat.data.ais.AisRepository
+import com.eboat.data.tide.TideRepository
+import com.eboat.data.weather.WeatherRepository
+import com.eboat.domain.model.AisTarget
+import com.eboat.domain.model.TideData
+import com.eboat.domain.model.TripLogEntry
+import com.eboat.domain.model.WeatherData
 import com.eboat.domain.model.AlertZone
 import com.eboat.domain.model.AnchorState
 import com.eboat.domain.model.BoatState
@@ -39,6 +46,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val routeDao = db.routeDao()
     private val alertZoneDao = db.alertZoneDao()
     private val offlineRepo = OfflineRepository(application)
+    private val tideRepo = TideRepository()
+    private val weatherRepo = WeatherRepository()
+    private val aisRepo = AisRepository()
+    private val tripLogDao = db.tripLogDao()
 
     private val _boatState = MutableStateFlow(BoatState())
     val boatState: StateFlow<BoatState> = _boatState.asStateFlow()
@@ -72,6 +83,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 updateGuidance(state)
                 updateAnchorAlarm(state)
                 updateAlertZones(state)
+                logTripPoint(state)
             }
         }
     }
@@ -131,6 +143,96 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         _activeRoute.value = null
         _activeRouteWaypoints.value = emptyList()
         _guidance.value = GuidanceState()
+    }
+
+    // --- Tides ---
+
+    private val _tideData = MutableStateFlow<TideData?>(null)
+    val tideData: StateFlow<TideData?> = _tideData.asStateFlow()
+
+    fun fetchTides(lat: Double, lon: Double) {
+        viewModelScope.launch {
+            _tideData.value = tideRepo.fetchTides(lat, lon)
+        }
+    }
+
+    fun fetchTidesAtBoat() {
+        val boat = _boatState.value
+        if (boat.hasPosition) fetchTides(boat.latitude, boat.longitude)
+    }
+
+    // --- Weather ---
+
+    private val _weatherData = MutableStateFlow<WeatherData?>(null)
+    val weatherData: StateFlow<WeatherData?> = _weatherData.asStateFlow()
+
+    fun fetchWeather(lat: Double, lon: Double) {
+        viewModelScope.launch {
+            _weatherData.value = weatherRepo.fetchForecast(lat, lon)
+        }
+    }
+
+    fun fetchWeatherAtBoat() {
+        val boat = _boatState.value
+        if (boat.hasPosition) fetchWeather(boat.latitude, boat.longitude)
+    }
+
+    // --- AIS ---
+
+    val aisTargets: StateFlow<Map<String, AisTarget>> = aisRepo.targets
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    val aisConnected: StateFlow<Boolean> = aisRepo.connected
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun connectAis(host: String, port: Int) {
+        viewModelScope.launch { aisRepo.connect(host, port) }
+    }
+
+    // --- Trip log ---
+
+    private val _tripRecording = MutableStateFlow(false)
+    val tripRecording: StateFlow<Boolean> = _tripRecording.asStateFlow()
+
+    private var currentTripId: Long = 0
+    private var lastLogTime: Long = 0
+
+    val tripIds: StateFlow<List<Long>> = tripLogDao.observeTripIds()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun startTripRecording() {
+        viewModelScope.launch {
+            currentTripId = (tripLogDao.getLastTripId() ?: 0) + 1
+            _tripRecording.value = true
+            lastLogTime = 0
+        }
+    }
+
+    fun stopTripRecording() {
+        _tripRecording.value = false
+    }
+
+    fun deleteTrip(tripId: Long) {
+        viewModelScope.launch { tripLogDao.deleteTrip(tripId) }
+    }
+
+    suspend fun getTripEntries(tripId: Long) = tripLogDao.getEntriesForTrip(tripId)
+
+    private fun logTripPoint(boat: BoatState) {
+        if (!_tripRecording.value || !boat.hasPosition) return
+        val now = System.currentTimeMillis()
+        // Log every 10 seconds
+        if (now - lastLogTime < 10_000) return
+        lastLogTime = now
+        viewModelScope.launch {
+            tripLogDao.insert(TripLogEntry(
+                tripId = currentTripId,
+                latitude = boat.latitude,
+                longitude = boat.longitude,
+                sog = boat.speedOverGround,
+                cog = boat.courseOverGround
+            ))
+        }
     }
 
     // --- Alert zones ---

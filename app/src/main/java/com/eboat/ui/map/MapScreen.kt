@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -67,6 +69,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val activeRoute by viewModel.activeRoute.collectAsState()
     val guidance by viewModel.guidance.collectAsState()
     val activeRouteWaypoints by viewModel.activeRouteWaypoints.collectAsState()
+    val tideData by viewModel.tideData.collectAsState()
     val alertZones by viewModel.alertZones.collectAsState()
     val triggeredZones by viewModel.triggeredZones.collectAsState()
     val anchorState by viewModel.anchorState.collectAsState()
@@ -108,6 +111,31 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     // Anchor
     var showAnchorDialog by remember { mutableStateOf(false) }
     var anchorCircle by remember { mutableStateOf<org.maplibre.android.annotations.Polygon?>(null) }
+
+    // Menu
+    var showMenu by remember { mutableStateOf(false) }
+
+    // Weather
+    val weatherData by viewModel.weatherData.collectAsState()
+    var showWeatherDialog by remember { mutableStateOf(false) }
+
+    // AIS
+    val aisTargets by viewModel.aisTargets.collectAsState()
+    val aisConnected by viewModel.aisConnected.collectAsState()
+    var showAisDialog by remember { mutableStateOf(false) }
+    var aisHost by remember { mutableStateOf("192.168.1.1") }
+    var aisPort by remember { mutableStateOf("10110") }
+
+    // Trip log
+    val tripRecording by viewModel.tripRecording.collectAsState()
+    val tripIds by viewModel.tripIds.collectAsState()
+    var showTripDialog by remember { mutableStateOf(false) }
+
+    // Help
+    var showHelp by remember { mutableStateOf(false) }
+
+    // Tide dialog
+    var showTideDialog by remember { mutableStateOf(false) }
 
     // Offline dialog
     var showOfflineDialog by remember { mutableStateOf(false) }
@@ -454,7 +482,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             )
         }
 
-        // Buttons column
+        // Menu button (top-right) + center on boat
         Column(
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -470,65 +498,85 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                             ), 500
                         )
                     },
-                    containerColor = MaterialTheme.colorScheme.primary
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(40.dp)
                 ) { Text("\u2295", color = Color.White) }
             }
-            // Route button
-            FloatingActionButton(
-                onClick = {
-                    if (routes.isEmpty() && waypoints.size >= 2) {
-                        routeName = ""
-                        selectedWaypointIds.clear()
-                        showRouteCreation = true
-                    } else {
-                        showRouteList = true
-                    }
-                },
-                containerColor = Color(0xFF1B3A5C)
-            ) { Text("R", color = Color.White) }
-            // Offline button
-            FloatingActionButton(
-                onClick = {
-                    viewModel.refreshOfflineRegions()
-                    showOfflineDialog = true
-                },
-                containerColor = Color(0xFF0077B6)
-            ) { Text("\u2193", color = Color.White) }
-            // Alert zone button
-            FloatingActionButton(
-                onClick = { showAlertZoneDialog = true },
-                containerColor = Color(0xFFFF9800)
-            ) { Text("Z", color = Color.White) }
-            // Anchor button
+            // Anchor quick-access (colored by state)
             if (boatState.hasPosition) {
                 FloatingActionButton(
                     onClick = { showAnchorDialog = true },
                     containerColor = if (anchorState.active) {
                         if (anchorState.isDragging) Color(0xFFE63946) else Color(0xFF2E7D32)
-                    } else Color(0xFF666666)
-                ) { Text("\u2693", color = Color.White) }
+                    } else Color(0xFF666666),
+                    modifier = Modifier.size(40.dp)
+                ) { Text("\u2693", color = Color.White, style = MaterialTheme.typography.bodySmall) }
             }
+            // Menu hamburger
+            FloatingActionButton(
+                onClick = { showMenu = true },
+                containerColor = Color(0xFF1B3A5C),
+                modifier = Modifier.size(40.dp)
+            ) { Text("\u2261", color = Color.White) }
         }
     }
 
     // Create waypoint dialog
     if (showWaypointDialog) {
+        var wpLat by remember { mutableStateOf(pendingWaypointLatLng?.let {
+            formatCoordinate(it.latitude, true) } ?: "") }
+        var wpLon by remember { mutableStateOf(pendingWaypointLatLng?.let {
+            formatCoordinate(it.longitude, false) } ?: "") }
+        var manualCoords by remember { mutableStateOf(false) }
+
         AlertDialog(
             onDismissRequest = { showWaypointDialog = false },
             title = { Text("Nouveau waypoint") },
             text = {
-                TextField(
-                    value = waypointName,
-                    onValueChange = { waypointName = it },
-                    label = { Text("Nom") },
-                    singleLine = true
-                )
+                Column {
+                    TextField(
+                        value = waypointName,
+                        onValueChange = { waypointName = it },
+                        label = { Text("Nom") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    TextButton(onClick = { manualCoords = !manualCoords }) {
+                        Text(if (manualCoords) "Utiliser position carte" else "Saisir coordonn\u00e9es")
+                    }
+                    if (manualCoords) {
+                        TextField(
+                            value = wpLat,
+                            onValueChange = { wpLat = it },
+                            label = { Text("Latitude (ex: 46.1500)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        TextField(
+                            value = wpLon,
+                            onValueChange = { wpLon = it },
+                            label = { Text("Longitude (ex: -1.1500)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                        )
+                    }
+                }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val latLng = pendingWaypointLatLng
-                    if (latLng != null && waypointName.isNotBlank()) {
-                        viewModel.addWaypoint(waypointName.trim(), latLng.latitude, latLng.longitude)
+                    if (waypointName.isNotBlank()) {
+                        if (manualCoords) {
+                            val lat = wpLat.toDoubleOrNull()
+                            val lon = wpLon.toDoubleOrNull()
+                            if (lat != null && lon != null) {
+                                viewModel.addWaypoint(waypointName.trim(), lat, lon)
+                            }
+                        } else {
+                            val latLng = pendingWaypointLatLng
+                            if (latLng != null) {
+                                viewModel.addWaypoint(waypointName.trim(), latLng.latitude, latLng.longitude)
+                            }
+                        }
                     }
                     showWaypointDialog = false
                 }) { Text("Cr\u00e9er") }
@@ -539,19 +587,42 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         )
     }
 
-    // Waypoint action dialog (move / delete)
+    // Waypoint action dialog (move / edit coords / delete)
     waypointToAct?.let { wp ->
+        var editCoords by remember { mutableStateOf(false) }
+        var editLat by remember { mutableStateOf(wp.latitude.toString()) }
+        var editLon by remember { mutableStateOf(wp.longitude.toString()) }
+
         AlertDialog(
             onDismissRequest = { waypointToAct = null },
             title = { Text(wp.name) },
             text = {
-                Text("${formatCoordinate(wp.latitude, true)} ${formatCoordinate(wp.longitude, false)}")
+                Column {
+                    if (!editCoords) {
+                        Text("${formatCoordinate(wp.latitude, true)} ${formatCoordinate(wp.longitude, false)}")
+                    } else {
+                        TextField(value = editLat, onValueChange = { editLat = it },
+                            label = { Text("Latitude") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth())
+                        TextField(value = editLon, onValueChange = { editLon = it },
+                            label = { Text("Longitude") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+                        TextButton(onClick = {
+                            val lat = editLat.toDoubleOrNull()
+                            val lon = editLon.toDoubleOrNull()
+                            if (lat != null && lon != null) {
+                                viewModel.moveWaypoint(wp, lat, lon)
+                                waypointToAct = null
+                            }
+                        }) { Text("Valider") }
+                    }
+                }
             },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteWaypoint(wp)
                     waypointToAct = null
-                }) { Text("Supprimer") }
+                }) { Text("Supprimer", color = Color(0xFFE63946)) }
             },
             dismissButton = {
                 Row {
@@ -559,6 +630,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         waypointToMove = wp
                         waypointToAct = null
                     }) { Text("D\u00e9placer") }
+                    TextButton(onClick = {
+                        editCoords = !editCoords
+                        editLat = wp.latitude.toString()
+                        editLon = wp.longitude.toString()
+                    }) { Text("Coordonn\u00e9es") }
                     TextButton(onClick = { waypointToAct = null }) { Text("Fermer") }
                 }
             }
@@ -763,6 +839,44 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         )
     }
 
+    // Tide dialog
+    if (showTideDialog) {
+        AlertDialog(
+            onDismissRequest = { showTideDialog = false },
+            title = { Text("Mar\u00e9es") },
+            text = {
+                Column {
+                    val data = tideData
+                    if (data == null) {
+                        Text("Chargement...")
+                    } else if (data.highLow.isEmpty()) {
+                        Text("Pas de donn\u00e9es de mar\u00e9es pour cette position")
+                    } else {
+                        Text("Position: ${data.stationName}",
+                            style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        val timeFormat = java.text.SimpleDateFormat("EEE HH:mm", Locale.getDefault())
+                        data.highLow.forEach { extreme ->
+                            val icon = if (extreme.isHigh) "\u25B2" else "\u25BC"
+                            val label = if (extreme.isHigh) "PM" else "BM"
+                            val color = if (extreme.isHigh) Color(0xFF0077B6) else Color(0xFF2E7D32)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("$icon $label", color = color)
+                                Text(timeFormat.format(java.util.Date(extreme.time)))
+                                Text(String.format(Locale.US, "%.1f m", extreme.height))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTideDialog = false }) { Text("Fermer") }
+            }
+        )
+    }
+
     // Alert zone dialog
     if (showAlertZoneDialog) {
         AlertDialog(
@@ -819,6 +933,192 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             },
             confirmButton = {
                 TextButton(onClick = { showAlertZoneDialog = false }) { Text("Fermer") }
+            }
+        )
+    }
+
+    // Main menu
+    if (showMenu) {
+        AlertDialog(
+            onDismissRequest = { showMenu = false },
+            title = { Text("Menu") },
+            text = {
+                Column {
+                    val menuItems = listOf(
+                        "Routes" to { showMenu = false; showRouteList = true },
+                        "Cartes hors-ligne" to { showMenu = false; viewModel.refreshOfflineRegions(); showOfflineDialog = true },
+                        "Mar\u00e9es" to { showMenu = false; viewModel.fetchTidesAtBoat(); showTideDialog = true },
+                        "M\u00e9t\u00e9o" to { showMenu = false; viewModel.fetchWeatherAtBoat(); showWeatherDialog = true },
+                        "Zones d'alerte" to { showMenu = false; showAlertZoneDialog = true },
+                        "AIS" to { showMenu = false; showAisDialog = true },
+                        "Journal de bord" to { showMenu = false; showTripDialog = true },
+                        "Aide" to { showMenu = false; showHelp = true }
+                    )
+                    menuItems.forEach { (label, action) ->
+                        Text(
+                            text = label,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { action() }
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showMenu = false }) { Text("Fermer") }
+            }
+        )
+    }
+
+    // Weather dialog
+    if (showWeatherDialog) {
+        AlertDialog(
+            onDismissRequest = { showWeatherDialog = false },
+            title = { Text("M\u00e9t\u00e9o marine") },
+            text = {
+                Column {
+                    val data = weatherData
+                    if (data == null) {
+                        Text("Chargement...")
+                    } else if (data.forecasts.isEmpty()) {
+                        Text("Pas de donn\u00e9es m\u00e9t\u00e9o")
+                    } else {
+                        val timeFormat = java.text.SimpleDateFormat("EEE HH:mm", Locale.getDefault())
+                        // Show next 24h, every 3h
+                        val now = System.currentTimeMillis()
+                        val filtered = data.forecasts.filter { it.time >= now }.take(8)
+                        Row(modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Heure", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+                            Text("Vent", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+                            Text("Raf.", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.7f))
+                            Text("Vague", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.7f))
+                            Text("hPa", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.7f))
+                        }
+                        filtered.forEach { f ->
+                            val windDir = arrayOf("N","NE","E","SE","S","SW","W","NW")[(f.windDirectionDeg / 45).toInt() % 8]
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(timeFormat.format(java.util.Date(f.time)),
+                                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                                Text(String.format(Locale.US, "%.0f kn %s", f.windSpeedKnots, windDir),
+                                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                                Text(String.format(Locale.US, "%.0f", f.gustSpeedKnots),
+                                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.7f))
+                                Text(String.format(Locale.US, "%.1fm", f.waveHeightM),
+                                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.7f))
+                                Text(String.format(Locale.US, "%.0f", f.pressureHpa),
+                                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.7f))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showWeatherDialog = false }) { Text("Fermer") }
+            }
+        )
+    }
+
+    // AIS dialog
+    if (showAisDialog) {
+        AlertDialog(
+            onDismissRequest = { showAisDialog = false },
+            title = { Text("AIS") },
+            text = {
+                Column {
+                    if (!aisConnected) {
+                        TextField(value = aisHost, onValueChange = { aisHost = it },
+                            label = { Text("Adresse IP") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth())
+                        TextField(value = aisPort, onValueChange = { aisPort = it },
+                            label = { Text("Port") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+                        TextButton(onClick = {
+                            viewModel.connectAis(aisHost, aisPort.toIntOrNull() ?: 10110)
+                        }) { Text("Connecter") }
+                    } else {
+                        Text("Connect\u00e9 \u2022 ${aisTargets.size} cibles")
+                        aisTargets.values.sortedByDescending { it.lastUpdate }.take(10).forEach { t ->
+                            Text("${t.mmsi} ${t.name.ifBlank { "---" }} ${String.format(Locale.US, "%.1f kn", t.sog)}",
+                                style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAisDialog = false }) { Text("Fermer") }
+            }
+        )
+    }
+
+    // Trip log dialog
+    if (showTripDialog) {
+        AlertDialog(
+            onDismissRequest = { showTripDialog = false },
+            title = { Text("Journal de bord") },
+            text = {
+                Column {
+                    if (!tripRecording) {
+                        TextButton(onClick = { viewModel.startTripRecording() }) {
+                            Text("D\u00e9marrer l'enregistrement")
+                        }
+                    } else {
+                        TextButton(onClick = { viewModel.stopTripRecording() }) {
+                            Text("Arr\u00eater l'enregistrement", color = Color(0xFFE63946))
+                        }
+                    }
+                    if (tripIds.isNotEmpty()) {
+                        Text("Trajets enregistr\u00e9s :",
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(top = 8.dp))
+                        tripIds.forEach { id ->
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Text("Trajet #$id")
+                                TextButton(onClick = { viewModel.deleteTrip(id) }) { Text("X") }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTripDialog = false }) { Text("Fermer") }
+            }
+        )
+    }
+
+    // Help dialog
+    if (showHelp) {
+        AlertDialog(
+            onDismissRequest = { showHelp = false },
+            title = { Text("Aide") },
+            text = {
+                LazyColumn {
+                    items(listOf(
+                        "Appui long" to "Cr\u00e9er un waypoint (loin d'un WP existant) ou modifier un WP (pr\u00e8s d'un existant)",
+                        "Tap sur marqueur" to "Voir les d\u00e9tails / supprimer / d\u00e9placer",
+                        "\u2295 (recentrer)" to "Recentrer la carte sur le bateau",
+                        "\u2693 (ancre)" to "Activer/d\u00e9sactiver l'alarme de mouillage",
+                        "\u2261 (menu)" to "Acc\u00e9der aux fonctions : routes, cartes offline, mar\u00e9es, m\u00e9t\u00e9o, zones d'alerte, AIS, journal de bord",
+                        "Routes" to "Cr\u00e9er une route en s\u00e9lectionnant des waypoints dans l'ordre. Activer pour afficher le guidage (BRG/DST/ETA/XTE)",
+                        "Zones d'alerte" to "D\u00e9finir des zones polygonales avec alerte \u00e0 l'entr\u00e9e ou la sortie",
+                        "Cartes hors-ligne" to "T\u00e9l\u00e9charger la zone visible pour naviguer sans connexion",
+                        "Journal de bord" to "Enregistre automatiquement la trace GPS toutes les 10 secondes"
+                    )) { (title, desc) ->
+                        Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                            Text(title, style = MaterialTheme.typography.titleSmall,
+                                color = Color(0xFF1B3A5C))
+                            Text(desc, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showHelp = false }) { Text("Fermer") }
             }
         )
     }
