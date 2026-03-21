@@ -49,6 +49,22 @@ fun crossTrackNm(
     return (xte * EARTH_RADIUS_M) / NM_IN_METERS
 }
 
+/** Ray-casting point-in-polygon test */
+fun isPointInPolygon(lat: Double, lon: Double, polygon: List<Pair<Double, Double>>): Boolean {
+    var inside = false
+    var j = polygon.size - 1
+    for (i in polygon.indices) {
+        val (yi, xi) = polygon[i]
+        val (yj, xj) = polygon[j]
+        if (((yi > lon) != (yj > lon)) &&
+            (lat < (xj - xi) * (lon - yi) / (yj - yi) + xi)) {
+            inside = !inside
+        }
+        j = i
+    }
+    return inside
+}
+
 /** ETA in seconds given distance in NM and speed in knots. Returns null if speed ~0. */
 fun etaSeconds(distanceNm: Double, speedKnots: Float): Long? {
     if (speedKnots < 0.5f) return null

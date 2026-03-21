@@ -8,6 +8,7 @@ import com.eboat.data.location.LocationRepository
 import com.eboat.data.offline.DownloadProgress
 import com.eboat.data.offline.OfflineRegionInfo
 import com.eboat.data.offline.OfflineRepository
+import com.eboat.domain.model.AlertZone
 import com.eboat.domain.model.AnchorState
 import com.eboat.domain.model.BoatState
 import com.eboat.domain.model.GuidanceState
@@ -18,6 +19,7 @@ import com.eboat.domain.navigation.bearingDeg
 import com.eboat.domain.navigation.crossTrackNm
 import com.eboat.domain.navigation.distanceNm
 import com.eboat.domain.navigation.etaSeconds
+import com.eboat.domain.navigation.isPointInPolygon
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -35,6 +37,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val db = EboatDatabase.getInstance(application)
     private val waypointDao = db.waypointDao()
     private val routeDao = db.routeDao()
+    private val alertZoneDao = db.alertZoneDao()
     private val offlineRepo = OfflineRepository(application)
 
     private val _boatState = MutableStateFlow(BoatState())
@@ -68,6 +71,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 _boatState.value = state
                 updateGuidance(state)
                 updateAnchorAlarm(state)
+                updateAlertZones(state)
             }
         }
     }
@@ -127,6 +131,72 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         _activeRoute.value = null
         _activeRouteWaypoints.value = emptyList()
         _guidance.value = GuidanceState()
+    }
+
+    // --- Alert zones ---
+
+    val alertZones: StateFlow<List<AlertZone>> = alertZoneDao.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _triggeredZones = MutableStateFlow<Set<Long>>(emptySet())
+    val triggeredZones: StateFlow<Set<Long>> = _triggeredZones.asStateFlow()
+
+    /** Track which zones the boat was previously inside */
+    private val previouslyInside = mutableSetOf<Long>()
+
+    fun addAlertZone(name: String, points: List<Pair<Double, Double>>, alertOnEntry: Boolean) {
+        viewModelScope.launch {
+            alertZoneDao.insert(AlertZone(
+                name = name,
+                pointsEncoded = AlertZone.encodePoints(points),
+                alertOnEntry = alertOnEntry
+            ))
+        }
+    }
+
+    fun deleteAlertZone(zone: AlertZone) {
+        viewModelScope.launch {
+            alertZoneDao.delete(zone)
+            _triggeredZones.value = _triggeredZones.value - zone.id
+            previouslyInside.remove(zone.id)
+        }
+    }
+
+    fun toggleAlertZone(zone: AlertZone) {
+        viewModelScope.launch {
+            alertZoneDao.update(zone.copy(enabled = !zone.enabled))
+        }
+    }
+
+    fun clearTriggeredZone(zoneId: Long) {
+        _triggeredZones.value = _triggeredZones.value - zoneId
+    }
+
+    private fun updateAlertZones(boat: BoatState) {
+        if (!boat.hasPosition) return
+        val zones = alertZones.value.filter { it.enabled }
+        val newTriggered = mutableSetOf<Long>()
+
+        for (zone in zones) {
+            val points = zone.decodePoints()
+            if (points.size < 3) continue
+            val inside = isPointInPolygon(boat.latitude, boat.longitude, points)
+            val wasInside = zone.id in previouslyInside
+
+            if (zone.alertOnEntry && inside && !wasInside) {
+                newTriggered.add(zone.id)
+                AnchorAlarmService.triggerAlarm(getApplication())
+            } else if (!zone.alertOnEntry && !inside && wasInside) {
+                newTriggered.add(zone.id)
+                AnchorAlarmService.triggerAlarm(getApplication())
+            }
+
+            if (inside) previouslyInside.add(zone.id) else previouslyInside.remove(zone.id)
+        }
+
+        if (newTriggered.isNotEmpty()) {
+            _triggeredZones.value = _triggeredZones.value + newTriggered
+        }
     }
 
     // --- Anchor alarm ---

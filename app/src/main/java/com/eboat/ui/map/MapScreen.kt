@@ -67,6 +67,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val activeRoute by viewModel.activeRoute.collectAsState()
     val guidance by viewModel.guidance.collectAsState()
     val activeRouteWaypoints by viewModel.activeRouteWaypoints.collectAsState()
+    val alertZones by viewModel.alertZones.collectAsState()
+    val triggeredZones by viewModel.triggeredZones.collectAsState()
     val anchorState by viewModel.anchorState.collectAsState()
     val offlineRegions by viewModel.offlineRegions.collectAsState()
     val downloadProgress by viewModel.downloadProgress.collectAsState()
@@ -93,6 +95,14 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 
     // Route list dialog
     var showRouteList by remember { mutableStateOf(false) }
+
+    // Alert zones
+    var showAlertZoneDialog by remember { mutableStateOf(false) }
+    var zoneCreationMode by remember { mutableStateOf(false) }
+    val zoneCreationPoints = remember { mutableStateListOf<LatLng>() }
+    var zoneAlertOnEntry by remember { mutableStateOf(true) }
+    var zoneName by remember { mutableStateOf("") }
+    val alertZonePolygons = remember { mutableMapOf<Long, org.maplibre.android.annotations.Polygon>() }
 
     // Anchor
     var showAnchorDialog by remember { mutableStateOf(false) }
@@ -204,6 +214,32 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         }
     }
 
+    // Draw alert zones
+    LaunchedEffect(alertZones, mapLibreMap) {
+        val map = mapLibreMap ?: return@LaunchedEffect
+        val currentIds = alertZones.map { it.id }.toSet()
+        alertZonePolygons.keys.filter { it !in currentIds }.forEach { id ->
+            alertZonePolygons.remove(id)?.let { map.removePolygon(it) }
+        }
+        alertZones.forEach { zone ->
+            if (zone.id !in alertZonePolygons) {
+                val pts = zone.decodePoints().map { LatLng(it.first, it.second) }
+                if (pts.size >= 3) {
+                    val isTriggered = zone.id in triggeredZones
+                    val fill = if (isTriggered) android.graphics.Color.argb(60, 230, 57, 70)
+                        else if (zone.alertOnEntry) android.graphics.Color.argb(30, 230, 57, 70)
+                        else android.graphics.Color.argb(30, 46, 125, 50)
+                    val stroke = if (isTriggered) android.graphics.Color.parseColor("#E63946")
+                        else if (zone.alertOnEntry) android.graphics.Color.parseColor("#E63946")
+                        else android.graphics.Color.parseColor("#2E7D32")
+                    alertZonePolygons[zone.id] = map.addPolygon(
+                        PolygonOptions().addAll(pts).fillColor(fill).strokeColor(stroke)
+                    )
+                }
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
@@ -221,6 +257,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         map.uiSettings.isZoomGesturesEnabled = true
 
                         map.addOnMapLongClickListener { latLng ->
+                            if (zoneCreationMode) {
+                                zoneCreationPoints.add(latLng)
+                                return@addOnMapLongClickListener true
+                            }
                             if (waypointToMove != null) {
                                 viewModel.moveWaypoint(waypointToMove!!, latLng.latitude, latLng.longitude)
                                 waypointToMove = null
@@ -287,6 +327,35 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                             color = Color(0xFF0077B6)
                         )
                     }
+                }
+            }
+        }
+
+        // Zone creation banner
+        if (zoneCreationMode) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 48.dp)
+                    .background(Color(0xFFFF9800), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("Appui long pour ajouter des points (${zoneCreationPoints.size})",
+                    color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                Row {
+                    if (zoneCreationPoints.size >= 3) {
+                        TextButton(onClick = {
+                            val pts = zoneCreationPoints.map { it.latitude to it.longitude }
+                            viewModel.addAlertZone(zoneName.ifBlank { "Zone" }, pts, zoneAlertOnEntry)
+                            zoneCreationMode = false
+                            zoneCreationPoints.clear()
+                        }) { Text("Valider", color = Color.White) }
+                    }
+                    TextButton(onClick = {
+                        zoneCreationMode = false
+                        zoneCreationPoints.clear()
+                    }) { Text("Annuler", color = Color.White) }
                 }
             }
         }
@@ -406,6 +475,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 },
                 containerColor = Color(0xFF0077B6)
             ) { Text("\u2193", color = Color.White) }
+            // Alert zone button
+            FloatingActionButton(
+                onClick = { showAlertZoneDialog = true },
+                containerColor = Color(0xFFFF9800)
+            ) { Text("Z", color = Color.White) }
             // Anchor button
             if (boatState.hasPosition) {
                 FloatingActionButton(
@@ -666,6 +740,66 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             },
             confirmButton = {
                 TextButton(onClick = { showOfflineDialog = false }) { Text("Fermer") }
+            }
+        )
+    }
+
+    // Alert zone dialog
+    if (showAlertZoneDialog) {
+        AlertDialog(
+            onDismissRequest = { showAlertZoneDialog = false },
+            title = { Text("Zones d'alerte") },
+            text = {
+                Column {
+                    TextButton(onClick = {
+                        showAlertZoneDialog = false
+                        zoneName = ""
+                        zoneAlertOnEntry = true
+                        zoneCreationPoints.clear()
+                        zoneCreationMode = true
+                    }) { Text("+ Nouvelle zone (entr\u00e9e)") }
+                    TextButton(onClick = {
+                        showAlertZoneDialog = false
+                        zoneName = ""
+                        zoneAlertOnEntry = false
+                        zoneCreationPoints.clear()
+                        zoneCreationMode = true
+                    }) { Text("+ Nouvelle zone (sortie)") }
+
+                    alertZones.forEach { zone ->
+                        val isTriggered = zone.id in triggeredZones
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    zone.name,
+                                    color = if (isTriggered) Color(0xFFE63946) else Color.Unspecified
+                                )
+                                Text(
+                                    if (zone.alertOnEntry) "Alerte entr\u00e9e" else "Alerte sortie",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Gray
+                                )
+                            }
+                            if (isTriggered) {
+                                TextButton(onClick = {
+                                    viewModel.clearTriggeredZone(zone.id)
+                                    com.eboat.service.AnchorAlarmService.clearAlarm(context)
+                                }) { Text("OK") }
+                            }
+                            TextButton(onClick = { viewModel.deleteAlertZone(zone) }) { Text("X") }
+                        }
+                    }
+                    if (alertZones.isEmpty()) {
+                        Text("Aucune zone d'alerte", modifier = Modifier.padding(12.dp))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAlertZoneDialog = false }) { Text("Fermer") }
             }
         )
     }
