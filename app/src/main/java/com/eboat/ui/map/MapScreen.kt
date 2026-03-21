@@ -1,6 +1,8 @@
 package com.eboat.ui.map
 
 import android.Manifest
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -12,9 +14,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -28,22 +33,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.viewmodel.compose.viewModel
-import org.maplibre.android.MapLibre
+import com.eboat.R
+import com.eboat.domain.model.Waypoint
 import org.maplibre.android.annotations.IconFactory
+import org.maplibre.android.annotations.Marker
 import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
-import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.MapLibreMap
-import org.maplibre.android.annotations.Marker
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Matrix
-import androidx.core.content.ContextCompat
-import androidx.core.graphics.drawable.toBitmap
-import com.eboat.R
+import org.maplibre.android.maps.MapView
 import java.util.Locale
 
 @Composable
@@ -51,9 +53,19 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val context = LocalContext.current
     val boatState by viewModel.boatState.collectAsState()
     val isTracking by viewModel.isTracking.collectAsState()
+    val waypoints by viewModel.waypoints.collectAsState()
     var permissionGranted by remember { mutableStateOf(false) }
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var boatMarker by remember { mutableStateOf<Marker?>(null) }
+    val waypointMarkers = remember { mutableMapOf<Long, Marker>() }
+
+    // Dialog state for creating a new waypoint
+    var showWaypointDialog by remember { mutableStateOf(false) }
+    var pendingWaypointLatLng by remember { mutableStateOf<LatLng?>(null) }
+    var waypointName by remember { mutableStateOf("") }
+
+    // Dialog state for deleting a waypoint
+    var waypointToDelete by remember { mutableStateOf<Waypoint?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -97,6 +109,29 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         }
     }
 
+    // Sync waypoint markers with database
+    LaunchedEffect(waypoints, mapLibreMap) {
+        val map = mapLibreMap ?: return@LaunchedEffect
+        val currentIds = waypoints.map { it.id }.toSet()
+
+        // Remove markers for deleted waypoints
+        waypointMarkers.keys.filter { it !in currentIds }.forEach { id ->
+            waypointMarkers.remove(id)?.let { map.removeMarker(it) }
+        }
+
+        // Add markers for new waypoints
+        waypoints.forEach { wp ->
+            if (wp.id !in waypointMarkers) {
+                val marker = map.addMarker(
+                    MarkerOptions()
+                        .position(LatLng(wp.latitude, wp.longitude))
+                        .title(wp.name)
+                )
+                waypointMarkers[wp.id] = marker
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         // MapLibre map
         AndroidView(
@@ -113,6 +148,25 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         map.uiSettings.isCompassEnabled = true
                         map.uiSettings.isRotateGesturesEnabled = true
                         map.uiSettings.isZoomGesturesEnabled = true
+
+                        // Long press to create waypoint
+                        map.addOnMapLongClickListener { latLng ->
+                            pendingWaypointLatLng = latLng
+                            waypointName = ""
+                            showWaypointDialog = true
+                            true
+                        }
+
+                        // Tap marker to delete waypoint
+                        map.setOnMarkerClickListener { marker ->
+                            val wp = waypoints.find { waypointMarkers[it.id] == marker }
+                            if (wp != null) {
+                                waypointToDelete = wp
+                                true
+                            } else {
+                                false
+                            }
+                        }
                     }
                 }
             },
@@ -150,9 +204,65 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     .padding(top = 48.dp, end = 16.dp),
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
-                Text("⊕", color = Color.White)
+                Text("\u2295", color = Color.White)
             }
         }
+    }
+
+    // Create waypoint dialog
+    if (showWaypointDialog) {
+        AlertDialog(
+            onDismissRequest = { showWaypointDialog = false },
+            title = { Text("Nouveau waypoint") },
+            text = {
+                TextField(
+                    value = waypointName,
+                    onValueChange = { waypointName = it },
+                    label = { Text("Nom") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val latLng = pendingWaypointLatLng
+                        if (latLng != null && waypointName.isNotBlank()) {
+                            viewModel.addWaypoint(waypointName.trim(), latLng.latitude, latLng.longitude)
+                        }
+                        showWaypointDialog = false
+                    }
+                ) { Text("Créer") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWaypointDialog = false }) {
+                    Text("Annuler")
+                }
+            }
+        )
+    }
+
+    // Delete waypoint dialog
+    waypointToDelete?.let { wp ->
+        AlertDialog(
+            onDismissRequest = { waypointToDelete = null },
+            title = { Text("Supprimer ${wp.name} ?") },
+            text = {
+                Text("${formatCoordinate(wp.latitude, true)} ${formatCoordinate(wp.longitude, false)}")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteWaypoint(wp)
+                        waypointToDelete = null
+                    }
+                ) { Text("Supprimer") }
+            },
+            dismissButton = {
+                TextButton(onClick = { waypointToDelete = null }) {
+                    Text("Annuler")
+                }
+            }
+        )
     }
 }
 
@@ -177,7 +287,7 @@ private fun NavigationOverlay(
         NavDataItem("LAT", formatCoordinate(latitude, isLatitude = true))
         NavDataItem("LON", formatCoordinate(longitude, isLatitude = false))
         NavDataItem("SOG", String.format(Locale.US, "%.1f kn", sog))
-        NavDataItem("COG", String.format(Locale.US, "%.0f°", cog))
+        NavDataItem("COG", String.format(Locale.US, "%.0f\u00B0", cog))
     }
 }
 
@@ -211,5 +321,5 @@ private fun formatCoordinate(value: Double, isLatitude: Boolean): String {
     val abs = Math.abs(value)
     val degrees = abs.toInt()
     val minutes = (abs - degrees) * 60
-    return String.format(Locale.US, "%d°%05.2f'%s", degrees, minutes, direction)
+    return String.format(Locale.US, "%d\u00B0%05.2f'%s", degrees, minutes, direction)
 }
