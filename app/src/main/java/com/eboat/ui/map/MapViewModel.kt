@@ -147,6 +147,15 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         _guidance.value = GuidanceState()
     }
 
+    // --- Map layers ---
+
+    private val _depthLayerVisible = MutableStateFlow(true)
+    val depthLayerVisible: StateFlow<Boolean> = _depthLayerVisible.asStateFlow()
+
+    fun toggleDepthLayer() {
+        _depthLayerVisible.value = !_depthLayerVisible.value
+    }
+
     // --- Tides ---
 
     private val _tideData = MutableStateFlow<TideData?>(null)

@@ -138,6 +138,15 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     // Help
     var showHelp by remember { mutableStateOf(false) }
 
+    // Depth layer
+    val depthLayerVisible by viewModel.depthLayerVisible.collectAsState()
+
+    // Bearing compass tool
+    var bearingMode by remember { mutableStateOf(false) }
+    var bearingPointA by remember { mutableStateOf<LatLng?>(null) }
+    var bearingPointB by remember { mutableStateOf<LatLng?>(null) }
+    var bearingLine by remember { mutableStateOf<Polyline?>(null) }
+
     // Tide dialog
     var showTideDialog by remember { mutableStateOf(false) }
 
@@ -288,6 +297,19 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     )
                 }
             }
+        }
+    }
+
+    // Toggle depth layer visibility
+    LaunchedEffect(depthLayerVisible, mapLibreMap) {
+        val map = mapLibreMap ?: return@LaunchedEffect
+        map.getStyle { style ->
+            style.getLayer("depth-overlay")?.setProperties(
+                org.maplibre.android.style.layers.PropertyFactory.visibility(
+                    if (depthLayerVisible) org.maplibre.android.style.layers.Property.VISIBLE
+                    else org.maplibre.android.style.layers.Property.NONE
+                )
+            )
         }
     }
 
@@ -499,6 +521,23 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         map.uiSettings.isZoomGesturesEnabled = true
 
                         map.addOnMapLongClickListener { latLng ->
+                            if (bearingMode) {
+                                if (bearingPointA == null) {
+                                    bearingPointA = latLng
+                                } else {
+                                    bearingPointB = latLng
+                                    // Draw bearing line
+                                    bearingLine?.let { map.removePolyline(it) }
+                                    bearingLine = map.addPolyline(
+                                        PolylineOptions()
+                                            .add(bearingPointA!!)
+                                            .add(latLng)
+                                            .color(android.graphics.Color.parseColor("#FF9800"))
+                                            .width(3f)
+                                    )
+                                }
+                                return@addOnMapLongClickListener true
+                            }
                             if (zoneCreationMode) {
                                 zoneCreationPoints.add(latLng)
                                 return@addOnMapLongClickListener true
@@ -614,6 +653,43 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 color = Color.White,
                 style = MaterialTheme.typography.bodyMedium
             )
+        }
+
+        // Bearing compass banner
+        if (bearingMode) {
+            val bearingText = if (bearingPointA != null && bearingPointB != null) {
+                val brg = com.eboat.domain.navigation.bearingDeg(
+                    bearingPointA!!.latitude, bearingPointA!!.longitude,
+                    bearingPointB!!.latitude, bearingPointB!!.longitude
+                )
+                val dist = com.eboat.domain.navigation.distanceNm(
+                    bearingPointA!!.latitude, bearingPointA!!.longitude,
+                    bearingPointB!!.latitude, bearingPointB!!.longitude
+                )
+                String.format(Locale.US, "%.0f\u00B0  %.2f NM", brg, dist)
+            } else if (bearingPointA != null) {
+                "Appui long pour le 2e point"
+            } else {
+                "Appui long pour le 1er point"
+            }
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 48.dp)
+                    .background(Color(0xFFFF9800), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(bearingText, color = Color.White, style = MaterialTheme.typography.titleMedium)
+                TextButton(onClick = {
+                    bearingPointA = null; bearingPointB = null
+                    bearingLine?.let { mapLibreMap?.removePolyline(it) }; bearingLine = null
+                }) { Text("Reset", color = Color.White) }
+                TextButton(onClick = {
+                    bearingMode = false; bearingPointA = null; bearingPointB = null
+                    bearingLine?.let { mapLibreMap?.removePolyline(it) }; bearingLine = null
+                }) { Text("Fermer", color = Color.White) }
+            }
         }
 
         // Weather legend (bottom-left)
@@ -1200,33 +1276,115 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     if (showMenu) {
         AlertDialog(
             onDismissRequest = { showMenu = false },
-            title = { Text("Menu") },
+            containerColor = Color(0xFF1B2B3D),
+            titleContentColor = Color.White,
+            title = {
+                Text("eboat", style = MaterialTheme.typography.titleLarge)
+            },
             text = {
-                Column {
-                    val menuItems = listOf(
-                        "Routes" to { showMenu = false; showRouteList = true },
-                        "Cartes hors-ligne" to { showMenu = false; viewModel.refreshOfflineRegions(); showOfflineDialog = true },
-                        "Mar\u00e9es" to { showMenu = false; viewModel.fetchTidesAtBoat(); showTideDialog = true },
-                        "M\u00e9t\u00e9o" to { showMenu = false; viewModel.fetchWeatherAtBoat(); showWeatherDialog = true },
-                        "Zones d'alerte" to { showMenu = false; showAlertZoneDialog = true },
-                        "AIS" to { showMenu = false; showAisDialog = true },
-                        "Journal de bord" to { showMenu = false; showTripDialog = true },
-                        "Aide" to { showMenu = false; showHelp = true }
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    data class MenuItem(val icon: String, val label: String, val sub: String, val action: () -> Unit)
+                    val items = listOf(
+                        MenuItem("\uD83D\uDDFA", "Routes", if (activeRoute != null) activeRoute!!.name else "${routes.size} routes") {
+                            showMenu = false; showRouteList = true
+                        },
+                        MenuItem("\u2693", "Mouillage", if (anchorState.active) "Actif \u2022 ${anchorState.radiusMeters}m" else "Inactif") {
+                            showMenu = false; showAnchorDialog = true
+                        },
+                        MenuItem("\uD83C\uDF0A", "Mar\u00e9es", "PM / BM") {
+                            showMenu = false; viewModel.fetchTidesAtBoat(); showTideDialog = true
+                        },
+                        MenuItem("\uD83D\uDCA8", "M\u00e9t\u00e9o & Overlay", "${weatherLayers.size} couches") {
+                            showMenu = false; viewModel.fetchWeatherAtBoat(); showWeatherDialog = true
+                        },
+                        MenuItem("\u26A0", "Zones d'alerte", "${alertZones.size} zones") {
+                            showMenu = false; showAlertZoneDialog = true
+                        },
+                        MenuItem("\uD83D\uDEE5", "AIS", if (aisConnected) "${aisTargets.size} cibles" else "D\u00e9connect\u00e9") {
+                            showMenu = false; showAisDialog = true
+                        },
+                        MenuItem("\uD83D\uDCDD", "Journal de bord", if (tripRecording) "Enregistrement..." else "${tripIds.size} trajets") {
+                            showMenu = false; showTripDialog = true
+                        },
+                        MenuItem("\uD83E\uDDED", "Compas de rel\u00e8vement", "Mesurer angles") {
+                            showMenu = false; bearingMode = true; bearingPointA = null; bearingPointB = null
+                        },
+                        MenuItem("\uD83D\uDCE5", "Cartes hors-ligne", "${offlineRegions.size} zones") {
+                            showMenu = false; viewModel.refreshOfflineRegions(); showOfflineDialog = true
+                        }
                     )
-                    menuItems.forEach { (label, action) ->
-                        Text(
-                            text = label,
+
+                    items.forEach { item ->
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { action() }
-                                .padding(vertical = 12.dp, horizontal = 8.dp),
-                            style = MaterialTheme.typography.bodyLarge
-                        )
+                                .clickable { item.action() }
+                                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(item.icon, style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(end = 16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(item.label, color = Color.White,
+                                    style = MaterialTheme.typography.bodyLarge)
+                                Text(item.sub, color = Color.White.copy(alpha = 0.6f),
+                                    style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
                     }
+
+                    // Layer toggles section
+                    Text("Couches", color = Color.White.copy(alpha = 0.5f),
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(top = 12.dp, start = 4.dp, bottom = 4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val chipMod = Modifier
+                            .weight(1f)
+                            .background(
+                                Color.White.copy(alpha = 0.12f),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(vertical = 10.dp)
+
+                        Column(
+                            modifier = chipMod.clickable { viewModel.toggleDepthLayer() },
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(if (depthLayerVisible) "\u2611" else "\u2610",
+                                color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                            Text("Sondes", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                        }
+                        Column(
+                            modifier = chipMod.clickable {
+                                val allTypes = com.eboat.domain.model.WeatherLayerType.values().toSet()
+                                if (weatherLayers.isEmpty()) {
+                                    allTypes.forEach { viewModel.toggleWeatherLayer(it) }
+                                    viewModel.fetchWeatherOverlay()
+                                } else viewModel.clearWeatherLayers()
+                            },
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(if (weatherLayers.isNotEmpty()) "\u2611" else "\u2610",
+                                color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                            Text("M\u00e9t\u00e9o", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+
+                    // Help link
+                    TextButton(
+                        onClick = { showMenu = false; showHelp = true },
+                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)
+                    ) { Text("? Aide", color = Color.White.copy(alpha = 0.5f)) }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showMenu = false }) { Text("Fermer") }
+                TextButton(onClick = { showMenu = false }) {
+                    Text("Fermer", color = Color.White.copy(alpha = 0.7f))
+                }
             }
         )
     }
