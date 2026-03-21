@@ -65,6 +65,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val activeRoute by viewModel.activeRoute.collectAsState()
     val guidance by viewModel.guidance.collectAsState()
     val activeRouteWaypoints by viewModel.activeRouteWaypoints.collectAsState()
+    val offlineRegions by viewModel.offlineRegions.collectAsState()
+    val downloadProgress by viewModel.downloadProgress.collectAsState()
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var boatMarker by remember { mutableStateOf<Marker?>(null) }
     val waypointMarkers = remember { mutableMapOf<Long, Marker>() }
@@ -88,6 +90,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 
     // Route list dialog
     var showRouteList by remember { mutableStateOf(false) }
+
+    // Offline dialog
+    var showOfflineDialog by remember { mutableStateOf(false) }
+    var offlineRegionName by remember { mutableStateOf("") }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -218,6 +224,33 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             update = { it.onResume() }
         )
 
+        // Download progress bar
+        downloadProgress?.let { progress ->
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 100.dp)
+                    .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (progress.error != null) {
+                    Text("Erreur: ${progress.error}", color = Color(0xFFE63946), style = MaterialTheme.typography.bodySmall)
+                } else {
+                    val pctText = if (progress.percent >= 0) "${progress.percent}%" else "..."
+                    val sizeKb = progress.completedBytes / 1024
+                    Text("T\u00e9l\u00e9chargement $pctText ($sizeKb Ko)", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                    if (progress.percent >= 0) {
+                        androidx.compose.material3.LinearProgressIndicator(
+                            progress = { progress.percent / 100f },
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            color = Color(0xFF0077B6)
+                        )
+                    }
+                }
+            }
+        }
+
         // Move mode banner
         if (waypointToMove != null) {
             Text(
@@ -311,6 +344,14 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 },
                 containerColor = Color(0xFF1B3A5C)
             ) { Text("R", color = Color.White) }
+            // Offline button
+            FloatingActionButton(
+                onClick = {
+                    viewModel.refreshOfflineRegions()
+                    showOfflineDialog = true
+                },
+                containerColor = Color(0xFF0077B6)
+            ) { Text("\u2193", color = Color.White) }
         }
     }
 
@@ -470,6 +511,98 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             },
             confirmButton = {
                 TextButton(onClick = { showRouteList = false }) { Text("Fermer") }
+            }
+        )
+    }
+
+    // Offline dialog
+    if (showOfflineDialog) {
+        var confirmClear by remember { mutableStateOf(false) }
+        AlertDialog(
+            onDismissRequest = { showOfflineDialog = false },
+            title = { Text("Cartes hors-ligne") },
+            text = {
+                Column {
+                    // Download current view
+                    Text(
+                        "T\u00e9l\u00e9charger la zone visible :",
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    TextField(
+                        value = offlineRegionName,
+                        onValueChange = { offlineRegionName = it },
+                        label = { Text("Nom de la zone") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    TextButton(
+                        onClick = {
+                            val map = mapLibreMap ?: return@TextButton
+                            val bounds = map.projection.visibleRegion.latLngBounds
+                            val zoom = map.cameraPosition.zoom
+                            if (offlineRegionName.isNotBlank()) {
+                                viewModel.downloadRegion(
+                                    name = offlineRegionName.trim(),
+                                    styleUrl = "asset://map_style.json",
+                                    bounds = bounds,
+                                    minZoom = (zoom - 2).coerceAtLeast(0.0),
+                                    maxZoom = (zoom + 4).coerceAtMost(18.0)
+                                )
+                                showOfflineDialog = false
+                            }
+                        }
+                    ) { Text("T\u00e9l\u00e9charger") }
+
+                    // Saved regions
+                    if (offlineRegions.isNotEmpty()) {
+                        Text(
+                            "Zones sauvegard\u00e9es :",
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                        )
+                        offlineRegions.forEach { region ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(region.name, modifier = Modifier.weight(1f))
+                                TextButton(onClick = {
+                                    viewModel.deleteOfflineRegion(region.id)
+                                }) { Text("X") }
+                            }
+                        }
+                    }
+
+                    // Clear cache
+                    if (offlineRegions.isNotEmpty()) {
+                        if (!confirmClear) {
+                            TextButton(
+                                onClick = { confirmClear = true },
+                                modifier = Modifier.padding(top = 8.dp)
+                            ) { Text("Vider le cache", color = Color(0xFFE63946)) }
+                        } else {
+                            Row(
+                                modifier = Modifier.padding(top = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Supprimer toutes les zones ?", color = Color(0xFFE63946),
+                                    style = MaterialTheme.typography.bodySmall)
+                                TextButton(onClick = {
+                                    viewModel.clearAllOfflineRegions()
+                                    confirmClear = false
+                                }) { Text("Confirmer", color = Color(0xFFE63946)) }
+                                TextButton(onClick = { confirmClear = false }) { Text("Annuler") }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showOfflineDialog = false }) { Text("Fermer") }
             }
         )
     }

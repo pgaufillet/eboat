@@ -5,6 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.eboat.data.db.EboatDatabase
 import com.eboat.data.location.LocationRepository
+import com.eboat.data.offline.DownloadProgress
+import com.eboat.data.offline.OfflineRegionInfo
+import com.eboat.data.offline.OfflineRepository
 import com.eboat.domain.model.BoatState
 import com.eboat.domain.model.GuidanceState
 import com.eboat.domain.model.Route
@@ -30,6 +33,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val db = EboatDatabase.getInstance(application)
     private val waypointDao = db.waypointDao()
     private val routeDao = db.routeDao()
+    private val offlineRepo = OfflineRepository(application)
 
     private val _boatState = MutableStateFlow(BoatState())
     val boatState: StateFlow<BoatState> = _boatState.asStateFlow()
@@ -120,6 +124,52 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         _activeRoute.value = null
         _activeRouteWaypoints.value = emptyList()
         _guidance.value = GuidanceState()
+    }
+
+    // --- Offline ---
+
+    private val _offlineRegions = MutableStateFlow<List<OfflineRegionInfo>>(emptyList())
+    val offlineRegions: StateFlow<List<OfflineRegionInfo>> = _offlineRegions.asStateFlow()
+
+    private val _downloadProgress = MutableStateFlow<DownloadProgress?>(null)
+    val downloadProgress: StateFlow<DownloadProgress?> = _downloadProgress.asStateFlow()
+
+    fun refreshOfflineRegions() {
+        viewModelScope.launch {
+            _offlineRegions.value = offlineRepo.listRegions()
+        }
+    }
+
+    fun downloadRegion(
+        name: String,
+        styleUrl: String,
+        bounds: org.maplibre.android.geometry.LatLngBounds,
+        minZoom: Double,
+        maxZoom: Double
+    ) {
+        viewModelScope.launch {
+            offlineRepo.downloadRegion(name, styleUrl, bounds, minZoom, maxZoom).collect { progress ->
+                _downloadProgress.value = progress
+                if (progress.isComplete) {
+                    _downloadProgress.value = null
+                    refreshOfflineRegions()
+                }
+            }
+        }
+    }
+
+    fun deleteOfflineRegion(regionId: Long) {
+        viewModelScope.launch {
+            offlineRepo.deleteRegion(regionId)
+            refreshOfflineRegions()
+        }
+    }
+
+    fun clearAllOfflineRegions() {
+        viewModelScope.launch {
+            offlineRepo.clearAllRegions()
+            refreshOfflineRegions()
+        }
     }
 
     fun advanceToNextWaypoint() {
