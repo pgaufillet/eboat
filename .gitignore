@@ -1,4 +1,7 @@
 *.iml
+.claude
+CLAUDE.md
+jarpa
 .gradle
 /local.properties
 /.idea
