@@ -44,8 +44,8 @@ class AnchorAlarmService : Service() {
 
             val notification = NotificationCompat.Builder(context, CHANNEL_ALARM)
                 .setSmallIcon(R.drawable.ic_boat)
-                .setContentTitle("ALARME MOUILLAGE")
-                .setContentText("Le bateau a d\u00e9riv\u00e9 hors du cercle de mouillage !")
+                .setContentTitle(context.getString(R.string.anchor_alarm_title))
+                .setContentText(context.getString(R.string.anchor_alarm_text))
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setSound(alarmSound)
@@ -68,15 +68,15 @@ class AnchorAlarmService : Service() {
             val nm = context.getSystemService(NotificationManager::class.java)
 
             val watchChannel = NotificationChannel(
-                CHANNEL_ANCHOR, "Veille de mouillage",
+                CHANNEL_ANCHOR, context.getString(R.string.anchor_watch_channel),
                 NotificationManager.IMPORTANCE_LOW
-            ).apply { description = "Notification active pendant la veille de mouillage" }
+            ).apply { description = context.getString(R.string.anchor_watch_channel_desc) }
 
             val alarmChannel = NotificationChannel(
-                CHANNEL_ALARM, "Alarme de mouillage",
+                CHANNEL_ALARM, context.getString(R.string.anchor_alarm_channel),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Alarme sonore si le bateau d\u00e9rive"
+                description = context.getString(R.string.anchor_alarm_channel_desc)
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 500, 200, 500, 200, 500)
                 val alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
@@ -101,8 +101,8 @@ class AnchorAlarmService : Service() {
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ANCHOR)
             .setSmallIcon(R.drawable.ic_boat)
-            .setContentTitle("Veille de mouillage active")
-            .setContentText("Surveillance de la position du bateau")
+            .setContentTitle(getString(R.string.anchor_watch_active))
+            .setContentText(getString(R.string.monitoring_boat_position))
             .setOngoing(true)
             .setContentIntent(pi)
             .build()

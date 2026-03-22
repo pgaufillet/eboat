@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -516,10 +517,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                             .target(LatLng(46.15, -1.15))
                             .zoom(10.0)
                             .build()
-                        map.uiSettings.isCompassEnabled = true
+                        map.uiSettings.isCompasssEnabled = true
                         map.uiSettings.compassGravity = android.view.Gravity.TOP or android.view.Gravity.START
-                        map.uiSettings.setCompassMargins(40, 140, 0, 0)
-                        map.uiSettings.setCompassFadeFacingNorth(false)
+                        map.uiSettings.setCompasssMargins(40, 140, 0, 0)
+                        map.uiSettings.setCompasssFadeFacingNorth(false)
                         map.uiSettings.isRotateGesturesEnabled = true
                         map.uiSettings.isZoomGesturesEnabled = true
 
@@ -609,11 +610,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (progress.error != null) {
-                    Text("Erreur: ${progress.error}", color = Color(0xFFE63946), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.error_message, progress.error!!), color = Color(0xFFE63946), style = MaterialTheme.typography.bodySmall)
                 } else {
                     val pctText = if (progress.percent >= 0) "${progress.percent}%" else "..."
                     val sizeKb = progress.completedBytes / 1024
-                    Text("T\u00e9l\u00e9chargement $pctText ($sizeKb Ko)", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.downloading_progress, pctText, sizeKb), color = Color.White, style = MaterialTheme.typography.bodySmall)
                     if (progress.percent >= 0) {
                         androidx.compose.material3.LinearProgressIndicator(
                             progress = { progress.percent / 100f },
@@ -635,7 +636,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Appui long pour ajouter des points (${zoneCreationPoints.size})",
+                Text(stringResource(R.string.long_press_add_points, zoneCreationPoints.size),
                     color = Color.White, style = MaterialTheme.typography.bodyMedium)
                 Row {
                     if (zoneCreationPoints.size >= 3) {
@@ -644,12 +645,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                             viewModel.addAlertZone(zoneName.ifBlank { "Zone" }, pts, zoneAlertOnEntry)
                             zoneCreationMode = false
                             zoneCreationPoints.clear()
-                        }) { Text("Valider", color = Color.White) }
+                        }) { Text(stringResource(R.string.confirm), color = Color.White) }
                     }
                     TextButton(onClick = {
                         zoneCreationMode = false
                         zoneCreationPoints.clear()
-                    }) { Text("Annuler", color = Color.White) }
+                    }) { Text(stringResource(R.string.cancel), color = Color.White) }
                 }
             }
         }
@@ -657,7 +658,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         // Move mode banner
         if (waypointToMove != null) {
             Text(
-                "Appui long pour placer ${waypointToMove!!.name}",
+                stringResource(R.string.long_press_to_place, waypointToMove!!.name),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 48.dp)
@@ -681,9 +682,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 )
                 String.format(Locale.US, "%.0f\u00B0  %.2f NM", brg, dist)
             } else if (bearingPointA != null) {
-                "Appui long pour le 2e point"
+                stringResource(R.string.long_press_second_point)
             } else {
-                "Appui long pour le 1er point"
+                stringResource(R.string.long_press_first_point)
             }
             Row(
                 modifier = Modifier
@@ -699,13 +700,13 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     bearingLine?.let { mapLibreMap?.removePolyline(it) }; bearingLine = null
                     bearingMarkerA?.let { mapLibreMap?.removeMarker(it) }; bearingMarkerA = null
                     bearingMarkerB?.let { mapLibreMap?.removeMarker(it) }; bearingMarkerB = null
-                }) { Text("Reset", color = Color.White) }
+                }) { Text(stringResource(R.string.reset), color = Color.White) }
                 TextButton(onClick = {
                     bearingMode = false; bearingPointA = null; bearingPointB = null
                     bearingLine?.let { mapLibreMap?.removePolyline(it) }; bearingLine = null
                     bearingMarkerA?.let { mapLibreMap?.removeMarker(it) }; bearingMarkerA = null
                     bearingMarkerB?.let { mapLibreMap?.removeMarker(it) }; bearingMarkerB = null
-                }) { Text("Fermer", color = Color.White) }
+                }) { Text(stringResource(R.string.close), color = Color.White) }
             }
         }
 
@@ -719,7 +720,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     .padding(8.dp)
             ) {
                 if (WeatherLayerType.WIND in weatherLayers) {
-                    Text("Vent (kn)", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.wind_legend), color = Color.White, style = MaterialTheme.typography.labelSmall)
                 }
                 if (WeatherLayerType.WAVE_HEIGHT in weatherLayers) {
                     Row {
@@ -736,10 +737,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     }
                 }
                 if (WeatherLayerType.SWELL in weatherLayers) {
-                    Text("Houle (m/s)", color = Color(0xFF0077B6), style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.swell_legend), color = Color(0xFF0077B6), style = MaterialTheme.typography.labelSmall)
                 }
                 if (WeatherLayerType.PRESSURE in weatherLayers) {
-                    Text("Pression (hPa)", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.pressure_legend), color = Color.White, style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
@@ -760,9 +761,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         .padding(12.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    NavDataItem("\u2693", if (anchorState.isDragging) "ALARME" else "OK")
-                    NavDataItem("DIST", String.format(Locale.US, "%.0f m", anchorState.currentDistanceMeters))
-                    NavDataItem("RAYON", "${anchorState.radiusMeters} m")
+                    NavDataItem("\u2693", if (anchorState.isDragging) stringResource(R.string.alarm) else "OK")
+                    NavDataItem(stringResource(R.string.dist), String.format(Locale.US, "%.0f m", anchorState.currentDistanceMeters))
+                    NavDataItem(stringResource(R.string.radius), "${anchorState.radiusMeters} m")
                 }
             }
             if (guidance.active && !guidance.routeComplete) {
@@ -770,7 +771,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             }
             if (guidance.routeComplete) {
                 Text(
-                    "Route termin\u00e9e",
+                    stringResource(R.string.route_complete),
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color(0xFF2E7D32), RoundedCornerShape(12.dp))
@@ -854,31 +855,31 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 
         AlertDialog(
             onDismissRequest = { showWaypointDialog = false },
-            title = { Text("Nouveau waypoint") },
+            title = { Text(stringResource(R.string.new_waypoint)) },
             text = {
                 Column {
                     TextField(
                         value = waypointName,
                         onValueChange = { waypointName = it },
-                        label = { Text("Nom") },
+                        label = { Text(stringResource(R.string.name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     TextButton(onClick = { manualCoords = !manualCoords }) {
-                        Text(if (manualCoords) "Utiliser position carte" else "Saisir coordonn\u00e9es")
+                        Text(if (manualCoords) stringResource(R.string.use_map_position) else stringResource(R.string.enter_coordinates))
                     }
                     if (manualCoords) {
                         TextField(
                             value = wpLat,
                             onValueChange = { wpLat = it },
-                            label = { Text("Latitude (ex: 46.1500)") },
+                            label = { Text(stringResource(R.string.latitude_hint)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
                         TextField(
                             value = wpLon,
                             onValueChange = { wpLon = it },
-                            label = { Text("Longitude (ex: -1.1500)") },
+                            label = { Text(stringResource(R.string.longitude_hint)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                         )
@@ -902,10 +903,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         }
                     }
                     showWaypointDialog = false
-                }) { Text("Cr\u00e9er") }
+                }) { Text(stringResource(R.string.create)) }
             },
             dismissButton = {
-                TextButton(onClick = { showWaypointDialog = false }) { Text("Annuler") }
+                TextButton(onClick = { showWaypointDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -937,7 +938,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                                 viewModel.moveWaypoint(wp, lat, lon)
                                 waypointToAct = null
                             }
-                        }) { Text("Valider") }
+                        }) { Text(stringResource(R.string.confirm)) }
                     }
                 }
             },
@@ -945,14 +946,14 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 TextButton(onClick = {
                     viewModel.deleteWaypoint(wp)
                     waypointToAct = null
-                }) { Text("Supprimer", color = Color(0xFFE63946)) }
+                }) { Text(stringResource(R.string.delete), color = Color(0xFFE63946)) }
             },
             dismissButton = {
                 Row {
                     TextButton(onClick = {
                         waypointToMove = wp
                         waypointToAct = null
-                    }) { Text("D\u00e9placer") }
+                    }) { Text(stringResource(R.string.move)) }
                     TextButton(onClick = {
                         editCoords = !editCoords
                         editLat = wp.latitude.toString()
@@ -962,13 +963,13 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         viewModel.fetchWeather(wp.latitude, wp.longitude)
                         waypointToAct = null
                         showWeatherDialog = true
-                    }) { Text("M\u00e9t\u00e9o") }
+                    }) { Text(stringResource(R.string.weather)) }
                     TextButton(onClick = {
                         viewModel.fetchTides(wp.latitude, wp.longitude)
                         waypointToAct = null
                         showTideDialog = true
-                    }) { Text("Mar\u00e9es") }
-                    TextButton(onClick = { waypointToAct = null }) { Text("Fermer") }
+                    }) { Text(stringResource(R.string.tides)) }
+                    TextButton(onClick = { waypointToAct = null }) { Text(stringResource(R.string.close)) }
                 }
             }
         )
@@ -978,18 +979,18 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     if (showRouteCreation) {
         AlertDialog(
             onDismissRequest = { showRouteCreation = false },
-            title = { Text("Nouvelle route") },
+            title = { Text(stringResource(R.string.new_route)) },
             text = {
                 Column {
                     TextField(
                         value = routeName,
                         onValueChange = { routeName = it },
-                        label = { Text("Nom de la route") },
+                        label = { Text(stringResource(R.string.route_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Text(
-                        "S\u00e9lectionner les waypoints (dans l'ordre) :",
+                        stringResource(R.string.select_waypoints_in_order),
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
                     )
@@ -1025,10 +1026,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                             showRouteCreation = false
                         }
                     }
-                ) { Text("Cr\u00e9er") }
+                ) { Text(stringResource(R.string.create)) }
             },
             dismissButton = {
-                TextButton(onClick = { showRouteCreation = false }) { Text("Annuler") }
+                TextButton(onClick = { showRouteCreation = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -1037,7 +1038,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     if (showRouteList) {
         AlertDialog(
             onDismissRequest = { showRouteList = false },
-            title = { Text("Routes") },
+            title = { Text(stringResource(R.string.routes)) },
             text = {
                 Column {
                     if (waypoints.size >= 2) {
@@ -1046,7 +1047,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                             routeName = ""
                             selectedWaypointIds.clear()
                             showRouteCreation = true
-                        }) { Text("+ Nouvelle route") }
+                        }) { Text(stringResource(R.string.new_route_button)) }
                     }
                     routes.forEach { route ->
                         Row(
@@ -1070,12 +1071,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         }
                     }
                     if (routes.isEmpty()) {
-                        Text("Aucune route", modifier = Modifier.padding(12.dp))
+                        Text(stringResource(R.string.no_routes), modifier = Modifier.padding(12.dp))
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showRouteList = false }) { Text("Fermer") }
+                TextButton(onClick = { showRouteList = false }) { Text(stringResource(R.string.close)) }
             }
         )
     }
@@ -1085,19 +1086,19 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         var confirmClear by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { showOfflineDialog = false },
-            title = { Text("Cartes hors-ligne") },
+            title = { Text(stringResource(R.string.offline_maps)) },
             text = {
                 Column {
                     // Download current view
                     Text(
-                        "T\u00e9l\u00e9charger la zone visible :",
+                        stringResource(R.string.download_visible_area),
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(bottom = 4.dp)
                     )
                     TextField(
                         value = offlineRegionName,
                         onValueChange = { offlineRegionName = it },
-                        label = { Text("Nom de la zone") },
+                        label = { Text(stringResource(R.string.area_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -1117,12 +1118,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                                 showOfflineDialog = false
                             }
                         }
-                    ) { Text("T\u00e9l\u00e9charger") }
+                    ) { Text(stringResource(R.string.download)) }
 
                     // Saved regions
                     if (offlineRegions.isNotEmpty()) {
                         Text(
-                            "Zones sauvegard\u00e9es :",
+                            stringResource(R.string.saved_areas),
                             style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
                         )
@@ -1148,26 +1149,26 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                             TextButton(
                                 onClick = { confirmClear = true },
                                 modifier = Modifier.padding(top = 8.dp)
-                            ) { Text("Vider le cache", color = Color(0xFFE63946)) }
+                            ) { Text(stringResource(R.string.clear_cache), color = Color(0xFFE63946)) }
                         } else {
                             Row(
                                 modifier = Modifier.padding(top = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Supprimer toutes les zones ?", color = Color(0xFFE63946),
+                                Text(stringResource(R.string.delete_all_areas), color = Color(0xFFE63946),
                                     style = MaterialTheme.typography.bodySmall)
                                 TextButton(onClick = {
                                     viewModel.clearAllOfflineRegions()
                                     confirmClear = false
-                                }) { Text("Confirmer", color = Color(0xFFE63946)) }
-                                TextButton(onClick = { confirmClear = false }) { Text("Annuler") }
+                                }) { Text(stringResource(R.string.confirm), color = Color(0xFFE63946)) }
+                                TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.cancel)) }
                             }
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showOfflineDialog = false }) { Text("Fermer") }
+                TextButton(onClick = { showOfflineDialog = false }) { Text(stringResource(R.string.close)) }
             }
         )
     }
@@ -1176,21 +1177,21 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     if (showTideDialog) {
         AlertDialog(
             onDismissRequest = { showTideDialog = false },
-            title = { Text("Mar\u00e9es") },
+            title = { Text(stringResource(R.string.tides)) },
             text = {
                 Column {
                     val data = tideData
                     if (data == null) {
-                        Text("Chargement...")
+                        Text(stringResource(R.string.loading))
                     } else if (data.highLow.isEmpty()) {
-                        Text("Pas de donn\u00e9es de mar\u00e9es pour cette position")
+                        Text(stringResource(R.string.no_tide_data))
                     } else {
                         Text("Position: ${data.stationName}",
                             style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                         val timeFormat = java.text.SimpleDateFormat("EEE HH:mm", Locale.getDefault())
                         data.highLow.forEach { extreme ->
                             val icon = if (extreme.isHigh) "\u25B2" else "\u25BC"
-                            val label = if (extreme.isHigh) "PM" else "BM"
+                            val label = if (extreme.isHigh) stringResource(R.string.hw) else stringResource(R.string.lw)
                             val color = if (extreme.isHigh) Color(0xFF0077B6) else Color(0xFF2E7D32)
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -1205,7 +1206,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 
                     // Quick access to tides at waypoints
                     if (waypoints.isNotEmpty()) {
-                        Text("Mar\u00e9es aux waypoints :",
+                        Text(stringResource(R.string.tides_at_waypoints),
                             style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
                         waypoints.take(5).forEach { wp ->
@@ -1217,12 +1218,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showTideDialog = false }) { Text("Fermer") }
+                TextButton(onClick = { showTideDialog = false }) { Text(stringResource(R.string.close)) }
             },
             dismissButton = {
                 if (boatState.hasPosition) {
                     TextButton(onClick = { viewModel.fetchTidesAtBoat() }) {
-                        Text("Position bateau")
+                        Text(stringResource(R.string.boat_position))
                     }
                 }
             }
@@ -1233,7 +1234,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     if (showAlertZoneDialog) {
         AlertDialog(
             onDismissRequest = { showAlertZoneDialog = false },
-            title = { Text("Zones d'alerte") },
+            title = { Text(stringResource(R.string.alert_zones)) },
             text = {
                 Column {
                     TextButton(onClick = {
@@ -1242,14 +1243,14 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         zoneAlertOnEntry = true
                         zoneCreationPoints.clear()
                         zoneCreationMode = true
-                    }) { Text("+ Nouvelle zone (entr\u00e9e)") }
+                    }) { Text(stringResource(R.string.new_zone_entry)) }
                     TextButton(onClick = {
                         showAlertZoneDialog = false
                         zoneName = ""
                         zoneAlertOnEntry = false
                         zoneCreationPoints.clear()
                         zoneCreationMode = true
-                    }) { Text("+ Nouvelle zone (sortie)") }
+                    }) { Text(stringResource(R.string.new_zone_exit)) }
 
                     alertZones.forEach { zone ->
                         val isTriggered = zone.id in triggeredZones
@@ -1264,7 +1265,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                                     color = if (isTriggered) Color(0xFFE63946) else Color.Unspecified
                                 )
                                 Text(
-                                    if (zone.alertOnEntry) "Alerte entr\u00e9e" else "Alerte sortie",
+                                    if (zone.alertOnEntry) stringResource(R.string.entry_alert) else stringResource(R.string.exit_alert),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color.Gray
                                 )
@@ -1279,12 +1280,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         }
                     }
                     if (alertZones.isEmpty()) {
-                        Text("Aucune zone d'alerte", modifier = Modifier.padding(12.dp))
+                        Text(stringResource(R.string.no_alert_zones), modifier = Modifier.padding(12.dp))
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showAlertZoneDialog = false }) { Text("Fermer") }
+                TextButton(onClick = { showAlertZoneDialog = false }) { Text(stringResource(R.string.close)) }
             }
         )
     }
@@ -1378,56 +1379,56 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 }
 
                 Column {
-                    MenuSection("Navigation")
-                    PrimaryItem("Routes",
+                    MenuSection(stringResource(R.string.navigation))
+                    PrimaryItem(stringResource(R.string.routes),
                         if (activeRoute != null) activeRoute!!.name else "${routes.size}",
                         Color(0xFFE63946)) {
                         showMenu = false; showRouteList = true
                     }
-                    PrimaryItem("Mouillage",
+                    PrimaryItem(stringResource(R.string.anchor),
                         if (anchorState.active) "${anchorState.radiusMeters}m" else "---",
                         if (anchorState.isDragging) Color(0xFFE63946)
                         else if (anchorState.active) Color(0xFF2E7D32)
                         else Color(0xFF666666)) {
                         showMenu = false; showAnchorDialog = true
                     }
-                    PrimaryItem("M\u00e9t\u00e9o",
-                        if (weatherLayers.isNotEmpty()) "${weatherLayers.size} couches" else "---",
+                    PrimaryItem(stringResource(R.string.weather),
+                        if (weatherLayers.isNotEmpty()) stringResource(R.string.layers_count, weatherLayers.size) else "---",
                         Color(0xFF0077B6)) {
                         showMenu = false; viewModel.fetchWeatherAtBoat(); showWeatherDialog = true
                     }
 
-                    MenuSection("Donn\u00e9es")
-                    SecondaryItem("Mar\u00e9es", "PM / BM") {
+                    MenuSection(stringResource(R.string.data))
+                    SecondaryItem(stringResource(R.string.tides), stringResource(R.string.hw_lw)) {
                         showMenu = false; viewModel.fetchTidesAtBoat(); showTideDialog = true
                     }
                     SecondaryItem("AIS",
-                        if (aisConnected) "${aisTargets.size} cibles" else "---") {
+                        if (aisConnected) stringResource(R.string.targets_count, aisTargets.size) else "---") {
                         showMenu = false; showAisDialog = true
                     }
-                    SecondaryItem("Zones d'alerte", "${alertZones.size}") {
+                    SecondaryItem(stringResource(R.string.alert_zones), "${alertZones.size}") {
                         showMenu = false; showAlertZoneDialog = true
                     }
 
-                    MenuSection("Outils")
-                    SecondaryItem("Compas", "Rel\u00e8vement & distance") {
+                    MenuSection(stringResource(R.string.tools))
+                    SecondaryItem(stringResource(R.string.compass), stringResource(R.string.bearing_and_distance)) {
                         showMenu = false; bearingMode = true; bearingPointA = null; bearingPointB = null
                     }
-                    SecondaryItem("Journal de bord",
-                        if (tripRecording) "REC" else "${tripIds.size} trajets") {
+                    SecondaryItem(stringResource(R.string.trip_log),
+                        if (tripRecording) "REC" else stringResource(R.string.trips_count, tripIds.size)) {
                         showMenu = false; showTripDialog = true
                     }
-                    SecondaryItem("Cartes hors-ligne", "${offlineRegions.size} zones") {
+                    SecondaryItem(stringResource(R.string.offline_maps), stringResource(R.string.zones_count, offlineRegions.size)) {
                         showMenu = false; viewModel.refreshOfflineRegions(); showOfflineDialog = true
                     }
 
-                    MenuSection("Couches")
+                    MenuSection(stringResource(R.string.layers))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        LayerChip("Sondes", depthLayerVisible) { viewModel.toggleDepthLayer() }
-                        LayerChip("M\u00e9t\u00e9o", weatherLayers.isNotEmpty()) {
+                        LayerChip(stringResource(R.string.soundings), depthLayerVisible) { viewModel.toggleDepthLayer() }
+                        LayerChip(stringResource(R.string.weather), weatherLayers.isNotEmpty()) {
                             val allTypes = com.eboat.domain.model.WeatherLayerType.values().toSet()
                             if (weatherLayers.isEmpty()) {
                                 allTypes.forEach { viewModel.toggleWeatherLayer(it) }
@@ -1440,13 +1441,13 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     TextButton(
                         onClick = { showMenu = false; showHelp = true },
                         modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 10.dp)
-                    ) { Text("Aide", color = Color.White.copy(alpha = 0.35f),
+                    ) { Text(stringResource(R.string.help), color = Color.White.copy(alpha = 0.35f),
                         style = MaterialTheme.typography.labelMedium) }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { showMenu = false }) {
-                    Text("Fermer", color = Color.White.copy(alpha = 0.5f))
+                    Text(stringResource(R.string.close), color = Color.White.copy(alpha = 0.5f))
                 }
             }
         )
@@ -1456,14 +1457,14 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     if (showWeatherDialog) {
         AlertDialog(
             onDismissRequest = { showWeatherDialog = false },
-            title = { Text("M\u00e9t\u00e9o marine") },
+            title = { Text(stringResource(R.string.marine_weather)) },
             text = {
                 Column {
                     val data = weatherData
                     if (data == null) {
-                        Text("Chargement...")
+                        Text(stringResource(R.string.loading))
                     } else if (data.forecasts.isEmpty()) {
-                        Text("Pas de donn\u00e9es m\u00e9t\u00e9o")
+                        Text(stringResource(R.string.no_weather_data))
                     } else {
                         // Show position context
                         Text(
@@ -1478,10 +1479,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         val filtered = data.forecasts.filter { it.time >= now }.take(8)
                         Row(modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Heure", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
-                            Text("Vent", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
-                            Text("Raf.", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.7f))
-                            Text("Vague", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.7f))
+                            Text(stringResource(R.string.time), style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+                            Text(stringResource(R.string.wind), style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+                            Text(stringResource(R.string.gust), style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.7f))
+                            Text(stringResource(R.string.wave), style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.7f))
                             Text("hPa", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.7f))
                         }
                         filtered.forEach { f ->
@@ -1504,7 +1505,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 
                     // Quick access to weather at waypoints
                     if (waypoints.isNotEmpty()) {
-                        Text("M\u00e9t\u00e9o aux waypoints :",
+                        Text(stringResource(R.string.weather_at_waypoints),
                             style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
                         waypoints.take(5).forEach { wp ->
@@ -1515,7 +1516,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     }
 
                     // Layer selector
-                    Text("Couches carte :",
+                    Text(stringResource(R.string.map_layers),
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
                     WeatherLayerType.values().forEach { type ->
@@ -1536,21 +1537,21 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     }
                     Row(modifier = Modifier.padding(top = 8.dp)) {
                         TextButton(onClick = { viewModel.fetchWeatherOverlay() }) {
-                            Text("Charger overlay")
+                            Text(stringResource(R.string.load_overlay))
                         }
                         TextButton(onClick = { viewModel.clearWeatherLayers() }) {
-                            Text("Masquer tout")
+                            Text(stringResource(R.string.hide_all))
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showWeatherDialog = false }) { Text("Fermer") }
+                TextButton(onClick = { showWeatherDialog = false }) { Text(stringResource(R.string.close)) }
             },
             dismissButton = {
                 if (boatState.hasPosition) {
                     TextButton(onClick = { viewModel.fetchWeatherAtBoat() }) {
-                        Text("Position bateau")
+                        Text(stringResource(R.string.boat_position))
                     }
                 }
             }
@@ -1566,16 +1567,16 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 Column {
                     if (!aisConnected) {
                         TextField(value = aisHost, onValueChange = { aisHost = it },
-                            label = { Text("Adresse IP") }, singleLine = true,
+                            label = { Text(stringResource(R.string.ip_address)) }, singleLine = true,
                             modifier = Modifier.fillMaxWidth())
                         TextField(value = aisPort, onValueChange = { aisPort = it },
-                            label = { Text("Port") }, singleLine = true,
+                            label = { Text(stringResource(R.string.port)) }, singleLine = true,
                             modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
                         TextButton(onClick = {
                             viewModel.connectAis(aisHost, aisPort.toIntOrNull() ?: 10110)
-                        }) { Text("Connecter") }
+                        }) { Text(stringResource(R.string.connect)) }
                     } else {
-                        Text("Connect\u00e9 \u2022 ${aisTargets.size} cibles")
+                        Text(stringResource(R.string.connected_targets, aisTargets.size))
                         aisTargets.values.sortedByDescending { it.lastUpdate }.take(10).forEach { t ->
                             Text("${t.mmsi} ${t.name.ifBlank { "---" }} ${String.format(Locale.US, "%.1f kn", t.sog)}",
                                 style = MaterialTheme.typography.bodySmall)
@@ -1584,7 +1585,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showAisDialog = false }) { Text("Fermer") }
+                TextButton(onClick = { showAisDialog = false }) { Text(stringResource(R.string.close)) }
             }
         )
     }
@@ -1593,27 +1594,27 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     if (showTripDialog) {
         AlertDialog(
             onDismissRequest = { showTripDialog = false },
-            title = { Text("Journal de bord") },
+            title = { Text(stringResource(R.string.trip_log)) },
             text = {
                 Column {
                     if (!tripRecording) {
                         TextButton(onClick = { viewModel.startTripRecording() }) {
-                            Text("D\u00e9marrer l'enregistrement")
+                            Text(stringResource(R.string.start_recording))
                         }
                     } else {
                         TextButton(onClick = { viewModel.stopTripRecording() }) {
-                            Text("Arr\u00eater l'enregistrement", color = Color(0xFFE63946))
+                            Text(stringResource(R.string.stop_recording), color = Color(0xFFE63946))
                         }
                     }
                     if (tripIds.isNotEmpty()) {
-                        Text("Trajets enregistr\u00e9s :",
+                        Text(stringResource(R.string.recorded_trips),
                             style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier.padding(top = 8.dp))
                         tripIds.forEach { id ->
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically) {
-                                Text("Trajet #$id")
+                                Text(stringResource(R.string.trip_number, id))
                                 TextButton(onClick = { viewModel.deleteTrip(id) }) { Text("X") }
                             }
                         }
@@ -1621,7 +1622,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showTripDialog = false }) { Text("Fermer") }
+                TextButton(onClick = { showTripDialog = false }) { Text(stringResource(R.string.close)) }
             }
         )
     }
@@ -1630,30 +1631,31 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     if (showHelp) {
         AlertDialog(
             onDismissRequest = { showHelp = false },
-            title = { Text("Aide") },
+            title = { Text(stringResource(R.string.help)) },
             text = {
+                val helpItems = listOf(
+                    R.string.long_press to R.string.help_long_press,
+                    R.string.tap_on_marker to R.string.help_tap_marker,
+                    R.string.recenter_label to R.string.help_recenter,
+                    R.string.anchor_label to R.string.help_anchor,
+                    R.string.menu_label to R.string.help_menu,
+                    R.string.routes to R.string.help_routes,
+                    R.string.alert_zones to R.string.help_alert_zones,
+                    R.string.offline_maps to R.string.help_offline_maps,
+                    R.string.trip_log to R.string.help_trip_log
+                )
                 LazyColumn {
-                    items(listOf(
-                        "Appui long" to "Cr\u00e9er un waypoint (loin d'un WP existant) ou modifier un WP (pr\u00e8s d'un existant)",
-                        "Tap sur marqueur" to "Voir les d\u00e9tails / supprimer / d\u00e9placer",
-                        "\u2295 (recentrer)" to "Recentrer la carte sur le bateau",
-                        "\u2693 (ancre)" to "Activer/d\u00e9sactiver l'alarme de mouillage",
-                        "\u2261 (menu)" to "Acc\u00e9der aux fonctions : routes, cartes offline, mar\u00e9es, m\u00e9t\u00e9o, zones d'alerte, AIS, journal de bord",
-                        "Routes" to "Cr\u00e9er une route en s\u00e9lectionnant des waypoints dans l'ordre. Activer pour afficher le guidage (BRG/DST/ETA/XTE)",
-                        "Zones d'alerte" to "D\u00e9finir des zones polygonales avec alerte \u00e0 l'entr\u00e9e ou la sortie",
-                        "Cartes hors-ligne" to "T\u00e9l\u00e9charger la zone visible pour naviguer sans connexion",
-                        "Journal de bord" to "Enregistre automatiquement la trace GPS toutes les 10 secondes"
-                    )) { (title, desc) ->
+                    items(helpItems) { (titleRes, descRes) ->
                         Column(modifier = Modifier.padding(vertical = 6.dp)) {
-                            Text(title, style = MaterialTheme.typography.titleSmall,
+                            Text(stringResource(titleRes), style = MaterialTheme.typography.titleSmall,
                                 color = Color(0xFF1B3A5C))
-                            Text(desc, style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(descRes), style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showHelp = false }) { Text("Fermer") }
+                TextButton(onClick = { showHelp = false }) { Text(stringResource(R.string.close)) }
             }
         )
     }
@@ -1663,11 +1665,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         var sliderRadius by remember { mutableStateOf(anchorState.radiusMeters.toFloat()) }
         AlertDialog(
             onDismissRequest = { showAnchorDialog = false },
-            title = { Text(if (anchorState.active) "Veille de mouillage" else "Mouiller l'ancre") },
+            title = { Text(if (anchorState.active) stringResource(R.string.anchor_watch) else stringResource(R.string.drop_anchor)) },
             text = {
                 Column {
                     if (!anchorState.active) {
-                        Text("Rayon d'alarme : ${sliderRadius.toInt()} m")
+                        Text(stringResource(R.string.alarm_radius, sliderRadius.toInt()))
                         androidx.compose.material3.Slider(
                             value = sliderRadius,
                             onValueChange = { sliderRadius = it },
@@ -1675,18 +1677,18 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                             steps = 27
                         )
                         Text(
-                            "L'alarme se d\u00e9clenchera si le bateau d\u00e9rive au-del\u00e0 de ce rayon.",
+                            stringResource(R.string.alarm_radius_explanation),
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.Gray
                         )
                     } else {
-                        Text("Distance : ${String.format(Locale.US, "%.0f m", anchorState.currentDistanceMeters)}")
-                        Text("Rayon : ${anchorState.radiusMeters} m")
+                        Text(stringResource(R.string.distance_value, String.format(Locale.US, "%.0f m", anchorState.currentDistanceMeters)))
+                        Text(stringResource(R.string.radius_value, anchorState.radiusMeters))
                         if (anchorState.isDragging) {
-                            Text("LE BATEAU D\u00c9RIVE !", color = Color(0xFFE63946),
+                            Text(stringResource(R.string.boat_is_drifting), color = Color(0xFFE63946),
                                 style = MaterialTheme.typography.titleMedium)
                         }
-                        Text("\nAjuster le rayon :", modifier = Modifier.padding(top = 8.dp))
+                        Text(stringResource(R.string.adjust_radius), modifier = Modifier.padding(top = 8.dp))
                         sliderRadius = anchorState.radiusMeters.toFloat()
                         androidx.compose.material3.Slider(
                             value = sliderRadius,
@@ -1705,16 +1707,16 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     TextButton(onClick = {
                         viewModel.dropAnchor(sliderRadius.toInt())
                         showAnchorDialog = false
-                    }) { Text("Mouiller") }
+                    }) { Text(stringResource(R.string.drop)) }
                 } else {
                     TextButton(onClick = {
                         viewModel.liftAnchor()
                         showAnchorDialog = false
-                    }) { Text("Lever l'ancre", color = Color(0xFFE63946)) }
+                    }) { Text(stringResource(R.string.lift_anchor), color = Color(0xFFE63946)) }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAnchorDialog = false }) { Text("Fermer") }
+                TextButton(onClick = { showAnchorDialog = false }) { Text(stringResource(R.string.close)) }
             }
         )
     }

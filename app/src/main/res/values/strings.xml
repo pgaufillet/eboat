@@ -1,4 +1,158 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">eboat</string>
+
+    <!-- Common actions -->
+    <string name="close">Close</string>
+    <string name="cancel">Cancel</string>
+    <string name="confirm">Confirm</string>
+    <string name="delete">Delete</string>
+    <string name="create">Create</string>
+    <string name="download">Download</string>
+    <string name="drop">Drop</string>
+    <string name="reset">Reset</string>
+
+    <!-- Waypoint dialog -->
+    <string name="new_waypoint">New waypoint</string>
+    <string name="name">Name</string>
+    <string name="use_map_position">Use map position</string>
+    <string name="enter_coordinates">Enter coordinates</string>
+    <string name="latitude_hint">Latitude (e.g.: 46.1500)</string>
+    <string name="longitude_hint">Longitude (e.g.: -1.1500)</string>
+
+    <!-- Waypoint actions -->
+    <string name="move">Move</string>
+    <string name="weather">Weather</string>
+    <string name="tides">Tides</string>
+
+    <!-- Zone creation -->
+    <string name="long_press_add_points">Long press to add points (%1$d)</string>
+    <string name="long_press_to_place">Long press to place %1$s</string>
+    <string name="long_press_second_point">Long press for the 2nd point</string>
+    <string name="long_press_first_point">Long press for the 1st point</string>
+
+    <!-- Route -->
+    <string name="new_route">New Route</string>
+    <string name="route_name">Route name</string>
+    <string name="select_waypoints_in_order">Select waypoints (in order):</string>
+    <string name="routes">Routes</string>
+    <string name="new_route_button">+ New Route</string>
+    <string name="no_routes">No routes</string>
+
+    <!-- Offline maps -->
+    <string name="offline_maps">Offline Maps</string>
+    <string name="download_visible_area">Download visible area:</string>
+    <string name="area_name">Area name</string>
+    <string name="saved_areas">Saved areas:</string>
+    <string name="clear_cache">Clear cache</string>
+    <string name="delete_all_areas">Delete all areas?</string>
+
+    <!-- Tides -->
+    <string name="loading">Loading…</string>
+    <string name="no_tide_data">No tide data for this position</string>
+    <string name="tides_at_waypoints">Tides at waypoints:</string>
+    <string name="boat_position">Boat Position</string>
+    <string name="hw">HW</string>
+    <string name="lw">LW</string>
+
+    <!-- Alert zones -->
+    <string name="alert_zones">Alert Zones</string>
+    <string name="new_zone_entry">+ New zone (entry)</string>
+    <string name="new_zone_exit">+ New zone (exit)</string>
+    <string name="entry_alert">Entry alert</string>
+    <string name="exit_alert">Exit alert</string>
+    <string name="no_alert_zones">No alert zones</string>
+
+    <!-- Menu -->
+    <string name="navigation">Navigation</string>
+    <string name="anchor">Anchor</string>
+    <string name="layers_count">%1$d layers</string>
+    <string name="data">Data</string>
+    <string name="hw_lw">HW / LW</string>
+    <string name="targets_count">%1$d targets</string>
+    <string name="tools">Tools</string>
+    <string name="compass">Compass</string>
+    <string name="bearing_and_distance">Bearing &amp; distance</string>
+    <string name="trip_log">Trip Log</string>
+    <string name="trips_count">%1$d trips</string>
+    <string name="zones_count">%1$d zones</string>
+    <string name="layers">Layers</string>
+    <string name="soundings">Soundings</string>
+    <string name="help">Help</string>
+
+    <!-- Weather legend -->
+    <string name="wind_legend">Wind (kn)</string>
+    <string name="swell_legend">Swell (m/s)</string>
+    <string name="pressure_legend">Pressure (hPa)</string>
+
+    <!-- Weather dialog -->
+    <string name="marine_weather">Marine Weather</string>
+    <string name="no_weather_data">No weather data</string>
+    <string name="time">Time</string>
+    <string name="wind">Wind</string>
+    <string name="gust">Gust</string>
+    <string name="wave">Wave</string>
+    <string name="weather_at_waypoints">Weather at waypoints:</string>
+    <string name="map_layers">Map layers:</string>
+    <string name="load_overlay">Load overlay</string>
+    <string name="hide_all">Hide all</string>
+
+    <!-- AIS dialog -->
+    <string name="ip_address">IP Address</string>
+    <string name="port">Port</string>
+    <string name="connect">Connect</string>
+    <string name="connected_targets">Connected • %1$d targets</string>
+
+    <!-- Trip log -->
+    <string name="start_recording">Start recording</string>
+    <string name="stop_recording">Stop recording</string>
+    <string name="recorded_trips">Recorded trips:</string>
+    <string name="trip_number">Trip #%1$d</string>
+
+    <!-- Help dialog -->
+    <string name="long_press">Long press</string>
+    <string name="help_long_press">Create a waypoint (far from an existing WP) or edit a WP (near an existing one)</string>
+    <string name="tap_on_marker">Tap on marker</string>
+    <string name="help_tap_marker">View details / delete / move</string>
+    <string name="recenter_label">⊕ (recenter)</string>
+    <string name="help_recenter">Recenter map on the boat</string>
+    <string name="anchor_label">⚓ (anchor)</string>
+    <string name="help_anchor">Activate/deactivate anchor alarm</string>
+    <string name="menu_label">☰ (menu)</string>
+    <string name="help_menu">Access features: routes, offline maps, tides, weather, alert zones, AIS, trip log</string>
+    <string name="help_routes">Create a route by selecting waypoints in order. Activate to display guidance (BRG/DST/ETA/XTE)</string>
+    <string name="help_alert_zones">Define polygon zones with alert on entry or exit</string>
+    <string name="help_offline_maps">Download visible area to navigate without connection</string>
+    <string name="help_trip_log">Automatically records GPS trace every 10 seconds</string>
+
+    <!-- Anchor dialog -->
+    <string name="anchor_watch">Anchor Watch</string>
+    <string name="drop_anchor">Drop Anchor</string>
+    <string name="alarm_radius">Alarm radius: %1$d m</string>
+    <string name="alarm_radius_explanation">The alarm will trigger if the boat drifts beyond this radius.</string>
+    <string name="distance_value">Distance: %1$s</string>
+    <string name="radius_value">Radius: %1$d m</string>
+    <string name="boat_is_drifting">BOAT IS DRIFTING!</string>
+    <string name="adjust_radius">Adjust radius:</string>
+    <string name="lift_anchor">Lift Anchor</string>
+
+    <!-- Anchor service notifications -->
+    <string name="anchor_alarm_title">ANCHOR ALARM</string>
+    <string name="anchor_alarm_text">The boat has drifted outside the anchorage circle!</string>
+    <string name="anchor_alarm_channel">Anchor Alarm</string>
+    <string name="anchor_alarm_channel_desc">Sound alarm if the boat drifts</string>
+    <string name="anchor_watch_channel">Anchor Watch</string>
+    <string name="anchor_watch_active">Anchor watch active</string>
+    <string name="monitoring_boat_position">Monitoring boat position</string>
+    <string name="anchor_watch_channel_desc">Active notification during anchor watch</string>
+
+    <!-- Download progress -->
+    <string name="error_message">Error: %1$s</string>
+    <string name="downloading_progress">Downloading %1$s (%2$d KB)</string>
+
+    <!-- Navigation overlay -->
+    <string name="route_complete">Route complete</string>
+    <string name="alarm">ALARM</string>
+    <string name="dist">DIST</string>
+    <string name="radius">RADIUS</string>
 </resources>

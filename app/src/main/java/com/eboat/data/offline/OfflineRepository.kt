@@ -111,7 +111,7 @@ class OfflineRepository(context: Context) {
                         }
                         override fun mapboxTileCountLimitExceeded(limit: Long) {
                             trySend(DownloadProgress(0, 0, 0, 0, false,
-                                "Limite de tuiles dépassée ($limit)"))
+                                "Tile limit exceeded ($limit)"))
                             region.setDownloadState(OfflineRegion.STATE_INACTIVE)
                             channel.close()
                         }

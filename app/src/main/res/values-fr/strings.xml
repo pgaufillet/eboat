@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Common actions -->
+    <string name="close">Fermer</string>
+    <string name="cancel">Annuler</string>
+    <string name="confirm">Confirmer</string>
+    <string name="delete">Supprimer</string>
+    <string name="create">Créer</string>
+    <string name="download">Télécharger</string>
+    <string name="drop">Mouiller</string>
+    <string name="reset">Réinitialiser</string>
+
+    <!-- Waypoint dialog -->
+    <string name="new_waypoint">Nouveau waypoint</string>
+    <string name="name">Nom</string>
+    <string name="use_map_position">Utiliser position carte</string>
+    <string name="enter_coordinates">Saisir coordonnées</string>
+    <string name="latitude_hint">Latitude (ex: 46.1500)</string>
+    <string name="longitude_hint">Longitude (ex: -1.1500)</string>
+
+    <!-- Waypoint actions -->
+    <string name="move">Déplacer</string>
+    <string name="weather">Météo</string>
+    <string name="tides">Marées</string>
+
+    <!-- Zone creation -->
+    <string name="long_press_add_points">Appui long pour ajouter des points (%1$d)</string>
+    <string name="long_press_to_place">Appui long pour placer %1$s</string>
+    <string name="long_press_second_point">Appui long pour le 2e point</string>
+    <string name="long_press_first_point">Appui long pour le 1er point</string>
+
+    <!-- Route -->
+    <string name="new_route">Nouvelle route</string>
+    <string name="route_name">Nom de la route</string>
+    <string name="select_waypoints_in_order">Sélectionner les waypoints (dans l\'ordre) :</string>
+    <string name="routes">Routes</string>
+    <string name="new_route_button">+ Nouvelle route</string>
+    <string name="no_routes">Aucune route</string>
+
+    <!-- Offline maps -->
+    <string name="offline_maps">Cartes hors-ligne</string>
+    <string name="download_visible_area">Télécharger la zone visible :</string>
+    <string name="area_name">Nom de la zone</string>
+    <string name="saved_areas">Zones sauvegardées :</string>
+    <string name="clear_cache">Vider le cache</string>
+    <string name="delete_all_areas">Supprimer toutes les zones ?</string>
+
+    <!-- Tides -->
+    <string name="loading">Chargement…</string>
+    <string name="no_tide_data">Pas de données de marées pour cette position</string>
+    <string name="tides_at_waypoints">Marées aux waypoints :</string>
+    <string name="boat_position">Position bateau</string>
+    <string name="hw">PM</string>
+    <string name="lw">BM</string>
+
+    <!-- Alert zones -->
+    <string name="alert_zones">Zones d\'alerte</string>
+    <string name="new_zone_entry">+ Nouvelle zone (entrée)</string>
+    <string name="new_zone_exit">+ Nouvelle zone (sortie)</string>
+    <string name="entry_alert">Alerte entrée</string>
+    <string name="exit_alert">Alerte sortie</string>
+    <string name="no_alert_zones">Aucune zone d\'alerte</string>
+
+    <!-- Menu -->
+    <string name="navigation">Navigation</string>
+    <string name="anchor">Mouillage</string>
+    <string name="layers_count">%1$d couches</string>
+    <string name="data">Données</string>
+    <string name="hw_lw">PM / BM</string>
+    <string name="targets_count">%1$d cibles</string>
+    <string name="tools">Outils</string>
+    <string name="compass">Compas</string>
+    <string name="bearing_and_distance">Relèvement &amp; distance</string>
+    <string name="trip_log">Journal de bord</string>
+    <string name="trips_count">%1$d trajets</string>
+    <string name="zones_count">%1$d zones</string>
+    <string name="layers">Couches</string>
+    <string name="soundings">Sondes</string>
+    <string name="help">Aide</string>
+
+    <!-- Weather legend -->
+    <string name="wind_legend">Vent (kn)</string>
+    <string name="swell_legend">Houle (m/s)</string>
+    <string name="pressure_legend">Pression (hPa)</string>
+
+    <!-- Weather dialog -->
+    <string name="marine_weather">Météo marine</string>
+    <string name="no_weather_data">Pas de données météo</string>
+    <string name="time">Heure</string>
+    <string name="wind">Vent</string>
+    <string name="gust">Raf.</string>
+    <string name="wave">Vague</string>
+    <string name="weather_at_waypoints">Météo aux waypoints :</string>
+    <string name="map_layers">Couches carte :</string>
+    <string name="load_overlay">Charger overlay</string>
+    <string name="hide_all">Masquer tout</string>
+
+    <!-- AIS dialog -->
+    <string name="ip_address">Adresse IP</string>
+    <string name="port">Port</string>
+    <string name="connect">Connecter</string>
+    <string name="connected_targets">Connecté • %1$d cibles</string>
+
+    <!-- Trip log -->
+    <string name="start_recording">Démarrer l\'enregistrement</string>
+    <string name="stop_recording">Arrêter l\'enregistrement</string>
+    <string name="recorded_trips">Trajets enregistrés :</string>
+    <string name="trip_number">Trajet #%1$d</string>
+
+    <!-- Help dialog -->
+    <string name="long_press">Appui long</string>
+    <string name="help_long_press">Créer un waypoint (loin d\'un WP existant) ou modifier un WP (près d\'un existant)</string>
+    <string name="tap_on_marker">Tap sur marqueur</string>
+    <string name="help_tap_marker">Voir les détails / supprimer / déplacer</string>
+    <string name="recenter_label">⊕ (recentrer)</string>
+    <string name="help_recenter">Recentrer la carte sur le bateau</string>
+    <string name="anchor_label">⚓ (ancre)</string>
+    <string name="help_anchor">Activer/désactiver l\'alarme de mouillage</string>
+    <string name="menu_label">☰ (menu)</string>
+    <string name="help_menu">Accéder aux fonctions : routes, cartes offline, marées, météo, zones d\'alerte, AIS, journal de bord</string>
+    <string name="help_routes">Créer une route en sélectionnant des waypoints dans l\'ordre. Activer pour afficher le guidage (BRG/DST/ETA/XTE)</string>
+    <string name="help_alert_zones">Définir des zones polygonales avec alerte à l\'entrée ou la sortie</string>
+    <string name="help_offline_maps">Télécharger la zone visible pour naviguer sans connexion</string>
+    <string name="help_trip_log">Enregistre automatiquement la trace GPS toutes les 10 secondes</string>
+
+    <!-- Anchor dialog -->
+    <string name="anchor_watch">Veille de mouillage</string>
+    <string name="drop_anchor">Mouiller l\'ancre</string>
+    <string name="alarm_radius">Rayon d\'alarme : %1$d m</string>
+    <string name="alarm_radius_explanation">L\'alarme se déclenchera si le bateau dérive au-delà de ce rayon.</string>
+    <string name="distance_value">Distance : %1$s</string>
+    <string name="radius_value">Rayon : %1$d m</string>
+    <string name="boat_is_drifting">LE BATEAU DÉRIVE !</string>
+    <string name="adjust_radius">Ajuster le rayon :</string>
+    <string name="lift_anchor">Lever l\'ancre</string>
+
+    <!-- Anchor service notifications -->
+    <string name="anchor_alarm_title">ALARME MOUILLAGE</string>
+    <string name="anchor_alarm_text">Le bateau a dérivé hors du cercle de mouillage !</string>
+    <string name="anchor_alarm_channel">Alarme de mouillage</string>
+    <string name="anchor_alarm_channel_desc">Alarme sonore si le bateau dérive</string>
+    <string name="anchor_watch_channel">Veille de mouillage</string>
+    <string name="anchor_watch_active">Veille de mouillage active</string>
+    <string name="monitoring_boat_position">Surveillance de la position du bateau</string>
+    <string name="anchor_watch_channel_desc">Notification active pendant la veille de mouillage</string>
+
+    <!-- Download progress -->
+    <string name="error_message">Erreur : %1$s</string>
+    <string name="downloading_progress">Téléchargement %1$s (%2$d Ko)</string>
+
+    <!-- Navigation overlay -->
+    <string name="route_complete">Route terminée</string>
+    <string name="alarm">ALARME</string>
+    <string name="dist">DIST</string>
+    <string name="radius">RAYON</string>
+</resources>
